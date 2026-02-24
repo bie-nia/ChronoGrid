@@ -8,6 +8,7 @@ class ContactBase(BaseModel):
     name: str
     phone: Optional[str] = None
     notes: Optional[str] = None
+    interests: Optional[str] = None
     birthday: Optional[date] = None
     photo_url: Optional[str] = None
 
@@ -20,6 +21,7 @@ class ContactUpdate(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
     notes: Optional[str] = None
+    interests: Optional[str] = None
     birthday: Optional[date] = None
     photo_url: Optional[str] = None
 

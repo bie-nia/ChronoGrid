@@ -7,7 +7,7 @@ export function Sidebar() {
   const logout = useAuthStore((s) => s.logout)
 
   return (
-    <aside className="w-[300px] min-w-[280px] h-full bg-white border-r border-gray-100 flex flex-col overflow-hidden">
+    <aside className="w-[320px] min-w-[300px] h-full bg-white border-r border-gray-100 flex flex-col overflow-hidden">
       {/* Top brand */}
       <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between">
         <div>

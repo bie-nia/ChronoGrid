@@ -22,7 +22,6 @@ import { useSettingsSync } from '../../hooks/useSettingsSync'
 import { IconRenderer } from './IconRenderer'
 import { arrayMove } from '@dnd-kit/sortable'
 
-const HOUR_START = 8
 const HOUR_HEIGHT = 60
 
 type ActiveDrag =
@@ -33,10 +32,10 @@ type ActiveDrag =
 
 // ── Konfiguracja kwadrantów dla pickera ──────────────────────────────────────
 const QUADRANT_OPTIONS: { id: Quadrant; label: string; color: string; icon: string }[] = [
-  { id: 'do_first', label: 'Zrób teraz', color: '#ef4444', icon: '🔴' },
-  { id: 'schedule', label: 'Zaplanuj', color: '#3b82f6', icon: '🔵' },
-  { id: 'delegate', label: 'Deleguj', color: '#eab308', icon: '🟡' },
-  { id: 'eliminate', label: 'Eliminuj', color: '#6b7280', icon: '⚫' },
+  { id: 'do_first', label: 'Pilne · Ważne', color: '#ef4444', icon: '⚡' },
+  { id: 'schedule', label: 'Niepilne · Ważne', color: '#3b82f6', icon: '📅' },
+  { id: 'delegate', label: 'Pilne · Nieważne', color: '#eab308', icon: '🤝' },
+  { id: 'eliminate', label: 'Niepilne · Nieważne', color: '#6b7280', icon: '🗑️' },
 ]
 
 // ── QuadrantPicker — modal wyboru kwadrantu po dropie ────────────────────────
@@ -51,6 +50,7 @@ function QuadrantPicker({
   onSelect: (quadrant: Quadrant) => void
   onClose: () => void
 }) {
+  const iconSet = useCalendarStore((s) => s.iconSet)
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center"
@@ -78,7 +78,9 @@ function QuadrantPicker({
               }}
               onClick={() => onSelect(q.id)}
             >
-              <div className="text-lg mb-0.5">{q.icon}</div>
+              <div className="text-lg mb-0.5" style={{ color: q.color }}>
+                <IconRenderer icon={q.icon} size={20} iconSet={iconSet} />
+              </div>
               <div className="text-xs font-semibold" style={{ color: q.color }}>
                 {q.label}
               </div>
@@ -98,11 +100,12 @@ function QuadrantPicker({
   )
 }
 
-function yToHour(clientY: number, columnRect: DOMRect): number {
+function yToHour(clientY: number, columnRect: DOMRect, hourStart: number, hourEnd: number): number {
   const relY = clientY - columnRect.top
-  const rawHour = HOUR_START + relY / HOUR_HEIGHT
+  const rawHour = hourStart + relY / HOUR_HEIGHT
   const snapped = Math.round(rawHour * 4) / 4   // snap 15 min
-  return Math.max(HOUR_START, Math.min(21.75, snapped))
+  // max: hourEnd - 0.25 żeby event mógł się zacząć max kwadrans przed końcem widoku
+  return Math.max(hourStart, Math.min(hourEnd - 0.25, snapped))
 }
 
 /** Zwraca DOMRect kolumny dnia na podstawie danych z dropzone */
@@ -121,6 +124,8 @@ export function AppLayout() {
   const iconSet = useCalendarStore((s) => s.iconSet)
   const templateOrder = useCalendarStore((s) => s.templateOrder)
   const setTemplateOrder = useCalendarStore((s) => s.setTemplateOrder)
+  const hourStart = useCalendarStore((s) => s.hourStart)
+  const hourEnd = useCalendarStore((s) => s.hourEnd)
 
   // Sync ustawień z backendem (pobierz przy logowaniu, zapisz przy zmianach)
   useSettingsSync()
@@ -139,6 +144,11 @@ export function AppLayout() {
   const cursorYRef = useRef(0)
   const activeDragRef = useRef<ActiveDrag>(null)
   const currentOverRef = useRef<DragEndEvent['over'] | null>(null)
+  // Refy dla hourStart/hourEnd — żeby updateGhostFromRefs (w useEffect) miał świeże wartości
+  const hourStartRef = useRef(hourStart)
+  const hourEndRef = useRef(hourEnd)
+  hourStartRef.current = hourStart
+  hourEndRef.current = hourEnd
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -175,11 +185,13 @@ export function AppLayout() {
     const drag = activeDragRef.current
     const over = currentOverRef.current
     const curY = cursorYRef.current
+    const hs = hourStartRef.current
+    const he = hourEndRef.current
     if (!drag || !over) { setDragGhost(null); return }
     const col = getColumnRect(over)
     if (!col) { setDragGhost(null); return }
 
-    const startHour = yToHour(curY, col.rect)
+    const startHour = yToHour(curY, col.rect, hs, he)
 
     if (drag.type === 'template') {
       setDragGhost({
@@ -193,9 +205,9 @@ export function AppLayout() {
     } else if (drag.type === 'calendar_event') {
       const ev = drag.event
       const offsetHour = (drag.grabOffsetMin ?? 0) / 60
-      const adjustedStart = yToHour(curY, col.rect) - offsetHour
+      const adjustedStart = yToHour(curY, col.rect, hs, he) - offsetHour
       const snappedStart = Math.round(adjustedStart * 4) / 4   // snap 15 min
-      const clampedStart = Math.max(HOUR_START, Math.min(21.75, snappedStart))
+      const clampedStart = Math.max(hs, Math.min(he - 0.25, snappedStart))
       setDragGhost({
         dayIndex: col.dayIndex,
         startHour: clampedStart,
@@ -282,17 +294,17 @@ export function AppLayout() {
 
     // Wylicz docelową godzinę z aktualnego clientY kursora
     // Dla eventów: odejmij grabOffsetMin żeby event nie skakał na górę
-    let targetHour = 9
+    let targetHour = hourStart
     const colEl = overData.columnRef?.current
     if (colEl) {
       const rect = colEl.getBoundingClientRect()
-      const rawHour = yToHour(cursorYRef.current || rect.top + 60, rect)
+      const rawHour = yToHour(cursorYRef.current || rect.top + 60, rect, hourStart, hourEnd)
       const grabOffsetHour = (activeData?.type === 'calendar_event'
         ? ((activeData.grabOffsetMin as number) ?? 0)
         : 0) / 60
       const adjusted = rawHour - grabOffsetHour
       const snapped = Math.round(adjusted * 4) / 4
-      targetHour = Math.max(HOUR_START, Math.min(21.75, snapped))
+      targetHour = Math.max(hourStart, Math.min(hourEnd - 0.25, snapped))
     }
 
     const targetDate = new Date(overData.date)

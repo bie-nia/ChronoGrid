@@ -1,10 +1,74 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { contactsApi } from '../../api/contacts'
+import { BASE_URL } from '../../api/client'
 import { Contact } from '../../types'
 import { useCalendarStore } from '../../store/calendarStore'
 import { IconRenderer } from '../ui/IconRenderer'
+
+/** Buduje pełny URL do zdjęcia — obsługuje /uploads/... i zewnętrzne URL */
+function resolvePhotoUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined
+  if (url.startsWith('/')) return `${BASE_URL}${url}`
+  return url
+}
+
+async function sha256(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// ── PinGate — formularz weryfikacji PIN przed dostępem do prywatnych danych ──
+function PinGate({ onUnlock, label = 'Podaj PIN aby wyświetlić' }: { onUnlock: () => void; label?: string }) {
+  const pinHash = useCalendarStore((s) => s.contactPinHash)
+  const [value, setValue] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!pinHash) { onUnlock(); return }
+    setLoading(true)
+    setError(null)
+    const hash = await sha256(value)
+    setLoading(false)
+    if (hash === pinHash) {
+      onUnlock()
+    } else {
+      setError('Nieprawidłowy PIN')
+      setValue('')
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-6 px-4">
+      <span className="text-4xl">🔒</span>
+      <p className="text-white/60 text-sm text-center">{label}</p>
+      <input
+        type="text"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        value={value}
+        onChange={e => { setValue(e.target.value); setError(null) }}
+        onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+        placeholder="PIN lub hasło"
+        autoFocus
+        className="w-full max-w-[200px] bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white text-center placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400 tracking-widest"
+        style={{ WebkitTextSecurity: 'disc' } as React.CSSProperties}
+      />
+      {error && <p className="text-xs text-red-400">{error}</p>}
+      <button
+        onClick={handleSubmit}
+        disabled={!value || loading}
+        className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-lg px-5 py-1.5 text-sm font-semibold transition-colors"
+      >
+        Odblokuj
+      </button>
+    </div>
+  )
+}
 
 // ── Sprawdzenie czy dzisiaj są urodziny ────────────────────────────────────────
 export function isBirthdayToday(birthday: string): boolean {
@@ -29,7 +93,7 @@ function Avatar({ contact, size = 'md' }: { contact?: Partial<Contact>; size?: '
   return (
     <div className={`${cls} rounded-full bg-gradient-to-br from-indigo-500/30 to-purple-500/30 flex items-center justify-center shrink-0 overflow-hidden font-bold text-indigo-300 relative border border-white/10`}>
       {contact?.photo_url ? (
-        <img src={contact.photo_url} alt={name} className="w-full h-full object-cover"
+        <img src={resolvePhotoUrl(contact.photo_url)} alt={name} className="w-full h-full object-cover"
           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
       ) : (
         <span>{name ? name[0].toUpperCase() : '?'}</span>
@@ -53,7 +117,35 @@ function ContactForm({
   const [name, setName] = useState(contact?.name ?? '')
   const [phone, setPhone] = useState(contact?.phone ?? '')
   const [notes, setNotes] = useState(contact?.notes ?? '')
+  const [interests, setInterests] = useState(contact?.interests ?? '')
   const [photoUrl, setPhotoUrl] = useState(contact?.photo_url ?? '')
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const qc = useQueryClient()
+  const pinHash = useCalendarStore((s) => s.contactPinHash)
+  // Dla istniejącego kontaktu z notatkami/zainteresowaniami — PIN wymagany przed edycją
+  const needsPin = !!pinHash && !!(contact?.notes || contact?.interests)
+  const [editPrivateUnlocked, setEditPrivateUnlocked] = useState(!needsPin)
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !contact?.id) return
+    setPhotoError(null)
+    setPhotoUploading(true)
+    try {
+      const updated = await contactsApi.uploadPhoto(contact.id, file)
+      setPhotoUrl(updated.photo_url ?? '')
+      qc.invalidateQueries({ queryKey: ['contacts'] })
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setPhotoError(msg ?? 'Błąd uploadu zdjęcia')
+    } finally {
+      setPhotoUploading(false)
+      // Resetuj input żeby można wybrać ten sam plik ponownie
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   // Data urodzin rozbita na DD / MM / YYYY
   const parseBirthday = (iso?: string) => {
@@ -77,8 +169,8 @@ function ContactForm({
       name: name.trim(),
       phone: phone.trim() || undefined,
       notes: notes.trim() || undefined,
+      interests: interests.trim() || undefined,
       birthday: birthdayISO || undefined,
-      photo_url: photoUrl.trim() || undefined,
     })
   }
 
@@ -87,7 +179,39 @@ function ContactForm({
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
         {/* Avatar + imię */}
         <div className="flex items-center gap-4">
-          <Avatar contact={{ name, photo_url: photoUrl }} size="lg" />
+          {/* Klikalne kółko z avatarem — upload zdjęcia */}
+          <div className="relative shrink-0 group">
+            <Avatar contact={{ name, photo_url: photoUrl }} size="lg" />
+            {contact?.id ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={photoUploading}
+                  className="absolute inset-0 rounded-full flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-wait"
+                  title="Zmień zdjęcie"
+                >
+                  <span className="text-white text-xs font-medium">
+                    {photoUploading ? '...' : '📷'}
+                  </span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={handlePhotoSelect}
+                />
+              </>
+            ) : (
+              <div
+                className="absolute inset-0 rounded-full flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-default"
+                title="Zapisz kontakt, aby dodać zdjęcie"
+              >
+                <span className="text-white/60 text-[10px] text-center px-1 leading-tight">Zapisz najpierw</span>
+              </div>
+            )}
+          </div>
           <div className="flex-1 space-y-1.5">
             <input
               autoFocus
@@ -97,12 +221,9 @@ function ContactForm({
               onKeyDown={(e) => e.key === 'Enter' && handleSave()}
               className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400 font-medium"
             />
-            <input
-              placeholder="URL zdjęcia (opcjonalnie)"
-              value={photoUrl}
-              onChange={(e) => setPhotoUrl(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white/50 placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-            />
+            {photoError && (
+              <p className="text-xs text-red-400">{photoError}</p>
+            )}
           </div>
         </div>
 
@@ -154,16 +275,38 @@ function ContactForm({
           )}
         </div>
 
-        <div>
-          <label className="text-xs text-white/40 font-medium block mb-1.5">📝 Notatki</label>
-          <textarea
-            placeholder="Notatki o osobie..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={4}
-            className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+        {/* Sekcja prywatna — za PINem jeśli ustawiony */}
+        {editPrivateUnlocked ? (
+          <>
+            {pinHash && (
+              <p className="text-xs text-white/30 flex items-center gap-1">🔓 Sekcja prywatna odblokowana</p>
+            )}
+            <div>
+              <label className="text-xs text-white/40 font-medium block mb-1.5">⭐ Zainteresowania</label>
+              <input
+                placeholder="np. fotografia, góry, gotowanie..."
+                value={interests}
+                onChange={(e) => setInterests(e.target.value)}
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 font-medium block mb-1.5">📝 Notatki</label>
+              <textarea
+                placeholder="Notatki o osobie..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={7}
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+              />
+            </div>
+          </>
+        ) : (
+          <PinGate
+            onUnlock={() => setEditPrivateUnlocked(true)}
+            label="Podaj PIN aby edytować notatki i zainteresowania"
           />
-        </div>
+        )}
       </div>
 
       {/* Footer */}
@@ -198,16 +341,21 @@ function ContactForm({
 // ── Widok szczegółów kontaktu ─────────────────────────────────────────────────
 function ContactDetail({
   contact,
-  hideNotesBehindPin,
   onEdit,
 }: {
   contact: Contact
-  hideNotesBehindPin: boolean
   onEdit: () => void
 }) {
-  const [notesVisible, setNotesVisible] = useState(false)
+  const pinHash = useCalendarStore((s) => s.contactPinHash)
+  const [privateUnlocked, setPrivateUnlocked] = useState(false)
+  const hasPrivate = !!(contact.notes || contact.interests)
   const isToday = contact.birthday ? isBirthdayToday(contact.birthday) : false
   const daysLeft = contact.birthday ? daysUntilBirthday(contact.birthday) : null
+
+  // Gdy zmieniony kontakt — zresetuj odblokowanie
+  useEffect(() => { setPrivateUnlocked(false) }, [contact.id])
+
+  const showPrivate = !pinHash || privateUnlocked
 
   return (
     <div className="flex flex-col h-full relative">
@@ -244,26 +392,40 @@ function ContactDetail({
           </div>
         )}
 
-        {contact.notes && (
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-xs text-white/30 uppercase tracking-wider">Notatki</p>
-              {hideNotesBehindPin && (
-                <button
-                  onClick={() => setNotesVisible((v) => !v)}
-                  className="text-xs text-white/30 hover:text-white/60 transition-colors"
-                  title={notesVisible ? 'Ukryj notatki' : 'Pokaż notatki'}
-                >
-                  {notesVisible ? '🔓' : '📌'}
-                </button>
+        {/* Sekcja prywatna — zainteresowania + notatki */}
+        {hasPrivate && (
+          showPrivate ? (
+            <>
+              {pinHash && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-white/30">🔓 Odblokowano</span>
+                  <button
+                    onClick={() => setPrivateUnlocked(false)}
+                    className="text-xs text-white/20 hover:text-white/50 transition-colors"
+                  >
+                    Zablokuj ponownie
+                  </button>
+                </div>
               )}
-            </div>
-            {(!hideNotesBehindPin || notesVisible) ? (
-              <p className="text-white/70 text-sm leading-relaxed whitespace-pre-wrap">{contact.notes}</p>
-            ) : (
-              <p className="text-white/20 text-xs italic">Notatki ukryte — kliknij 📌 aby odsłonić</p>
-            )}
-          </div>
+              {contact.interests && (
+                <div>
+                  <p className="text-xs text-white/30 uppercase tracking-wider mb-1">Zainteresowania</p>
+                  <p className="text-white/70 text-sm leading-relaxed">{contact.interests}</p>
+                </div>
+              )}
+              {contact.notes && (
+                <div>
+                  <p className="text-xs text-white/30 uppercase tracking-wider mb-1">Notatki</p>
+                  <p className="text-white/70 text-sm leading-relaxed whitespace-pre-wrap">{contact.notes}</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <PinGate
+              onUnlock={() => setPrivateUnlocked(true)}
+              label="Podaj PIN aby zobaczyć notatki i zainteresowania"
+            />
+          )
         )}
       </div>
 
@@ -318,7 +480,6 @@ function ContactRow({
 // ── Główny overlay ────────────────────────────────────────────────────────────
 export function BestiaryOverlay({ onClose, initialContactId }: { onClose: () => void; initialContactId?: number }) {
   const qc = useQueryClient()
-  const hideNotesBehindPin = useCalendarStore((s) => s.hideContactNotes)
 
   const [selectedId, setSelectedId] = useState<number | null>(initialContactId ?? null)
   const [mode, setMode] = useState<'view' | 'edit' | 'new'>(initialContactId ? 'view' : 'view')
@@ -473,7 +634,6 @@ export function BestiaryOverlay({ onClose, initialContactId }: { onClose: () => 
               <div className="flex-1 min-h-0 relative">
                 <ContactDetail
                   contact={selected}
-                  hideNotesBehindPin={hideNotesBehindPin}
                   onEdit={() => setMode('edit')}
                 />
               </div>

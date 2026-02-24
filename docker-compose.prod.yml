@@ -48,7 +48,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Brak woluminu kodu — używa plików wbudowanych w obraz przez Dockerfile
+    volumes:
+      - uploads_data:/app/uploads
     command: >
       sh -c "alembic upgrade head &&
              python -m app.db.seed &&
@@ -69,3 +70,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:

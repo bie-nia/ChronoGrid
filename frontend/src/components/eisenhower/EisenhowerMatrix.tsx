@@ -13,9 +13,11 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { tasksApi } from '../../api/tasks'
-import { EisenhowerTask, Quadrant, getQuadrant, quadrantToFlags } from '../../types'
+import { eventsApi } from '../../api/events'
+import { EisenhowerTask, Event, Quadrant, getQuadrant, quadrantToFlags } from '../../types'
 import { useCalendarStore } from '../../store/calendarStore'
 import { IconRenderer } from '../ui/IconRenderer'
+import { parseTodoItems, TodoItem, setTodoChecked } from '../../lib/htmlUtils'
 
 // ── Konfiguracja kwadrantów ──────────────────────────────────────────────────
 interface QuadrantConfig {
@@ -326,12 +328,18 @@ function TaskTile({
   onSendToPending,
   onAddToPending,
   onContextMenu,
+  sourceColor,
+  sourceLabel,
+  sourceIcon,
 }: {
   task: EisenhowerTask
   config: QuadrantConfig
   onSendToPending: (task: EisenhowerTask) => void
   onAddToPending: (task: EisenhowerTask) => void  // tylko aktualizuje pendingIds, bez patcha
   onContextMenu: (e: React.MouseEvent, task: EisenhowerTask, isPending?: boolean) => void
+  sourceColor?: string   // kolor aktywności źródłowej (linked_event)
+  sourceLabel?: string   // tytuł aktywności do tooltipa
+  sourceIcon?: string    // ikona aktywności
 }) {
   const qc = useQueryClient()
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -371,6 +379,23 @@ function TaskTile({
     mutationFn: () => tasksApi.delete(task.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['eisenhower-tasks'] }),
   })
+
+  // Synchronizacja z opisem eventu: gdy status → done, zaznacz checkbox; gdy cofnięty, odznacz
+  const syncEventDescription = useCallback(async (newStatus: 'todo' | 'in_progress' | 'done') => {
+    if (!task.linked_event_id || !task.title) return
+    // Pobierz aktualny opis eventu z cache
+    const cached = qc.getQueryData<Event[]>(['events-all'])
+    const ev = cached?.find((e) => e.id === task.linked_event_id)
+    if (!ev?.description) return
+    const newChecked = newStatus === 'done'
+    const newHtml = setTodoChecked(ev.description, task.title, newChecked)
+    if (!newHtml) return
+    // Zaktualizuj opis eventu (synchronizuje też szablon i inne eventy przez backend)
+    await eventsApi.update(task.linked_event_id, { description: newHtml })
+    qc.invalidateQueries({ queryKey: ['events-all'] })
+    qc.invalidateQueries({ queryKey: ['events'] })
+  }, [task.linked_event_id, task.title, qc])
+
   const patchMut = useMutation({
     mutationFn: (data: Partial<EisenhowerTask>) => tasksApi.patch(task.id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['eisenhower-tasks'] }),
@@ -399,10 +424,14 @@ function TaskTile({
       onAddToPending(task)
     } else {
       patchMut.mutate({ status: next })
+      // Synchronizuj checkbox w opisie eventu (zaznacz gdy done, odznacz gdy cofnięty)
+      syncEventDescription(next)
     }
   }
 
   const statusTooltip = task.status === 'done' ? 'Ukończone — kliknij aby cofnąć' : task.status === 'in_progress' ? 'W toku — kliknij aby ukończyć' : 'Do zrobienia — kliknij aby rozpocząć'
+
+  const iconSet = useCalendarStore((s) => s.iconSet)
 
   return (
     <>
@@ -412,10 +441,13 @@ function TaskTile({
         onMouseEnter={handleMouseEnter}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className={`group relative rounded-lg px-2 py-1.5 cursor-grab active:cursor-grabbing select-none transition-all
-          ${config.bg} border ${config.border} ${isDragging ? 'opacity-30' : 'hover:brightness-110'}`}
+        className={`group relative rounded-lg cursor-grab active:cursor-grabbing select-none transition-all overflow-hidden
+          ${config.bg} border ${isDragging ? 'opacity-30' : 'hover:brightness-110'}`}
+        style={{ borderColor: sourceColor ? sourceColor + '70' : undefined,
+                 borderLeftWidth: sourceColor ? '3px' : undefined,
+                 borderLeftColor: sourceColor ?? undefined }}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
           {/* Ikona statusu — CSS circle w kolorze kwadrantu */}
           <button
             className="w-6 h-6 shrink-0 flex items-center justify-center rounded-lg transition-all hover:scale-110"
@@ -442,6 +474,12 @@ function TaskTile({
             )}
           </button>
           <div className="flex items-center gap-1 flex-1 min-w-0">
+            {/* Ikona aktywności źródłowej */}
+            {sourceColor && sourceIcon && (
+              <span className="shrink-0 opacity-70">
+                <IconRenderer icon={sourceIcon} size={10} iconSet={iconSet} />
+              </span>
+            )}
             <span className={`text-xs leading-snug font-medium truncate ${config.text} ${task.status === 'done' ? 'line-through opacity-50' : ''}`}>
               {task.title}
             </span>
@@ -472,10 +510,10 @@ function TaskTile({
         <TooltipPopup
           x={tooltipPos.x}
           y={tooltipPos.y}
-          description={trimmedDesc || undefined}
+          description={sourceLabel ? `📌 ${sourceLabel}${trimmedDesc ? '\n\n' + trimmedDesc : ''}` : trimmedDesc || undefined}
           dueDate={task.due_date}
           targetQuadrant={task.target_quadrant}
-          accentColor={config.doneColor}
+          accentColor={sourceColor ?? config.doneColor}
         />,
         document.body
       )}
@@ -520,6 +558,9 @@ function PendingTaskTile({
   )
 }
 
+// Mapa: eventId → { color, icon, title }
+export type EventColorMap = Record<number, { color: string; icon: string; title: string }>
+
 // ── Kwadrant z dropzone ───────────────────────────────────────────────────────
 function QuadrantZone({
   config,
@@ -527,12 +568,14 @@ function QuadrantZone({
   onSendToPending,
   onAddToPending,
   onContextMenu,
+  eventColorMap,
 }: {
   config: QuadrantConfig
   tasks: EisenhowerTask[]
   onSendToPending: (task: EisenhowerTask) => void
   onAddToPending: (task: EisenhowerTask) => void
   onContextMenu: (e: React.MouseEvent, task: EisenhowerTask, isPending?: boolean) => void
+  eventColorMap?: EventColorMap
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: config.id })
   return (
@@ -541,39 +584,39 @@ function QuadrantZone({
         ${isOver ? 'ring-2 ring-white/30 brightness-125' : ''}`}
     >
       {/* Nagłówek kwadrantu */}
-      <div className="flex items-center justify-between px-3 pt-2.5 pb-2 border-b shrink-0" style={{ borderColor: `${config.doneColor}35` }}>
-        <div className="flex items-center gap-2">
-          <div className="w-[3px] h-4 rounded-full" style={{ backgroundColor: config.doneColor }} />
-          <span className="text-xs font-bold text-white tracking-wide">{config.label}</span>
-          {tasks.length > 0 && (
-            <span
-              className="text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center"
-              style={{ backgroundColor: `${config.doneColor}30`, color: config.doneColor }}
-            >{tasks.length}</span>
-          )}
-        </div>
-        <div className="flex gap-1 items-center">
+      <div className="flex items-center gap-2 px-3 pt-2 pb-1.5 border-b shrink-0" style={{ borderColor: `${config.doneColor}35` }}>
+        <div className="w-[3px] h-3.5 rounded-full shrink-0" style={{ backgroundColor: config.doneColor }} />
+        <span
+          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${config.accent}`}
+          style={{ backgroundColor: `${config.doneColor}25` }}
+        >{config.urgentLabel}</span>
+        <span className={`text-[10px] font-medium ${config.accent} opacity-70`}>{config.importantLabel}</span>
+        {tasks.length > 0 && (
           <span
-            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${config.accent}`}
-            style={{ backgroundColor: `${config.doneColor}25` }}
-            title={`Pilność: ${config.urgentLabel}`}
-          >{config.urgentLabel}</span>
-          <span className={`text-[10px] opacity-60 font-medium ${config.accent}`} title={`Ważność: ${config.importantLabel}`}>{config.importantLabel}</span>
-        </div>
+            className="text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center ml-auto shrink-0"
+            style={{ backgroundColor: `${config.doneColor}30`, color: config.doneColor }}
+          >{tasks.length}</span>
+        )}
       </div>
       {/* Lista zadań — rośnie z contentem, bez wewnętrznego scrolla */}
       <div className="px-2.5 py-2">
         <div className="flex flex-col gap-1">
-          {tasks.map((t) => (
-            <TaskTile
-              key={t.id}
-              task={t}
-              config={config}
-              onSendToPending={onSendToPending}
-              onAddToPending={onAddToPending}
-              onContextMenu={onContextMenu}
-            />
-          ))}
+          {tasks.map((t) => {
+            const src = t.linked_event_id ? eventColorMap?.[t.linked_event_id] : undefined
+            return (
+              <TaskTile
+                key={t.id}
+                task={t}
+                config={config}
+                onSendToPending={onSendToPending}
+                onAddToPending={onAddToPending}
+                onContextMenu={onContextMenu}
+                sourceColor={src?.color}
+                sourceIcon={src?.icon}
+                sourceLabel={src?.title}
+              />
+            )
+          })}
           {tasks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-6 gap-1.5">
               <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: `${config.doneColor}15`, border: `1px dashed ${config.doneColor}40` }}>
@@ -625,10 +668,13 @@ function SidebarTaskRow({
 function DonePanel({
   tasks,
   onContextMenu,
+  eventColorMap,
 }: {
   tasks: EisenhowerTask[]
   onContextMenu: (e: React.MouseEvent, task: EisenhowerTask, isPending?: boolean) => void
+  eventColorMap?: EventColorMap
 }) {
+  const iconSet = useCalendarStore((s) => s.iconSet)
   if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-32 text-white/20 text-xs text-center px-4">
@@ -641,6 +687,7 @@ function DonePanel({
     <div className="flex flex-col gap-1.5">
       {tasks.map((t) => {
         const cfg = quadrantConfig(t)
+        const src = t.linked_event_id ? eventColorMap?.[t.linked_event_id] : undefined
         return (
           <div
             key={t.id}
@@ -648,13 +695,21 @@ function DonePanel({
           >
             <SidebarTaskRow
               task={t}
-              left={<span className="text-green-400 text-xs shrink-0">✓</span>}
+              left={
+                <span className="flex items-center gap-1 shrink-0">
+                  <span className="text-green-400 text-xs">✓</span>
+                  {src && <IconRenderer icon={src.icon} size={10} iconSet={iconSet} />}
+                </span>
+              }
               right={
                 <span
                   className="text-xs px-1.5 py-0.5 rounded-full shrink-0 line-through opacity-60"
-                  style={{ backgroundColor: cfg.doneColor + '25', color: cfg.doneColor }}
+                  style={{
+                    backgroundColor: (src?.color ?? cfg.doneColor) + '25',
+                    color: src?.color ?? cfg.doneColor,
+                  }}
                 >
-                  {cfg.label}
+                  {src?.title ?? cfg.label}
                 </span>
               }
             />
@@ -983,7 +1038,163 @@ function TaskAccelerateModal({
   )
 }
 
+// ── TODO z eventów — kafelek do przeciągnięcia ───────────────────────────────
+interface TodoDragData {
+  type: 'event_todo'
+  eventId: number
+  eventTitle: string
+  eventColor: string
+  eventIcon: string
+  todoText: string
+}
+
+function TodoItemTile({ eventId, eventTitle, eventColor, eventIcon, todoText }: {
+  eventId: number
+  eventTitle: string
+  eventColor: string
+  eventIcon: string
+  todoText: string
+}) {
+  const iconSet = useCalendarStore((s) => s.iconSet)
+  const dragData: TodoDragData = { type: 'event_todo', eventId, eventTitle, eventColor, eventIcon, todoText }
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `todo-${eventId}-${todoText}`,
+    data: dragData,
+  })
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-xs cursor-grab active:cursor-grabbing transition-all select-none ${isDragging ? 'opacity-30' : 'hover:brightness-125'}`}
+      style={{ backgroundColor: eventColor + '18', borderColor: eventColor + '40', color: 'rgba(255,255,255,0.85)' }}
+      title={`Przeciągnij "${todoText}" do kwadrantu`}
+    >
+      <IconRenderer icon={eventIcon} size={12} iconSet={iconSet} />
+      <span className="leading-tight">{todoText}</span>
+    </div>
+  )
+}
+
+// ── Panel TODO z eventów — prawa kolumna ─────────────────────────────────────
+function TodoSourcePanel({ tasks }: { tasks: EisenhowerTask[] }) {
+  const iconSet = useCalendarStore((s) => s.iconSet)
+  // expandedIds trzyma klucz grupy: templateId lub eventId (gdy brak szablonu)
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
+
+  const { data: allEvents = [] } = useQuery({
+    queryKey: ['events-all'],
+    queryFn: eventsApi.listAll,
+    staleTime: 30_000,
+  })
+
+  // Zbierz istniejące tytuły tasków (żeby nie duplikować)
+  const existingTitles = new Set(tasks.map((t) => t.title.toLowerCase().trim()))
+
+  // Deduplikacja: jeśli event ma activity_template_id, bierzemy jeden reprezentant per szablon
+  // Klucz grupy: "tpl-{id}" lub "ev-{id}"
+  const grouped: { key: string; ev: Event; color: string; icon: string; unchecked: TodoItem[] }[] = []
+  const seenTemplates = new Set<number>()
+
+  allEvents.forEach((ev: Event) => {
+    if (!ev.description) return
+    const tplId = ev.activity_template_id
+    if (tplId) {
+      if (seenTemplates.has(tplId)) return  // już mamy reprezentanta tego szablonu
+      seenTemplates.add(tplId)
+    }
+    const todos = parseTodoItems(ev.description ?? '')
+    const unchecked = todos.filter((t: TodoItem) => !t.checked && !existingTitles.has(t.text.toLowerCase().trim()))
+    if (unchecked.length === 0) return
+    const color = ev.activity_template?.color ?? ev.color ?? '#6366f1'
+    const icon = ev.activity_template?.icon ?? ev.icon ?? '📅'
+    const key = tplId ? `tpl-${tplId}` : `ev-${ev.id}`
+    grouped.push({ key, ev, color, icon, unchecked })
+  })
+
+  if (grouped.length === 0) {
+    return (
+      <p className="text-xs text-white/20 italic text-center pt-4">
+        Brak TODO w opisach aktywności
+      </p>
+    )
+  }
+
+  const toggle = (key: string) =>
+    setExpandedKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+
+  return (
+    <div className="space-y-1.5">
+      {grouped.map(({ key, ev, color, icon, unchecked }) => {
+        const isOpen = expandedKeys.has(key)
+        return (
+          <div key={key}>
+            {/* Nagłówek aktywności — klikalny, rozwija listę */}
+            <button
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:brightness-125 text-left"
+              style={{ backgroundColor: color + '22', color }}
+              onClick={() => toggle(key)}
+            >
+              <IconRenderer icon={icon} size={12} iconSet={iconSet} />
+              <span className="flex-1 truncate">{ev.title}</span>
+              <span className="shrink-0 text-white/40 font-normal">{unchecked.length}</span>
+              <span className="shrink-0 text-white/30 text-[10px]">{isOpen ? '▲' : '▼'}</span>
+            </button>
+            {/* Lista todo items — widoczna gdy rozwinięty */}
+            {isOpen && (
+              <div className="mt-1 ml-1.5 space-y-1">
+                {unchecked.map((item: TodoItem, i: number) => (
+                  <TodoItemTile
+                    key={i}
+                    eventId={ev.id}
+                    eventTitle={ev.title}
+                    eventColor={color}
+                    eventIcon={icon}
+                    todoText={item.text}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Overlay pełnoekranowy ─────────────────────────────────────────────────────
+// ── Lewa kolumna TODO jako dropzone ──────────────────────────────────────────
+function TodoDropZone({ tasks }: { tasks: EisenhowerTask[] }) {
+  const { setNodeRef, isOver } = useDroppable({ id: 'todo-panel' })
+  return (
+    <div
+      ref={setNodeRef}
+      className={`w-56 shrink-0 border-r flex flex-col overflow-hidden transition-all ${
+        isOver ? 'border-indigo-500/60 bg-indigo-500/5' : 'border-white/10'
+      }`}
+    >
+      <div className={`px-4 py-3 border-b shrink-0 flex items-center justify-between transition-all ${
+        isOver ? 'border-indigo-500/40' : 'border-white/10'
+      }`}>
+        <span className={`text-xs font-semibold uppercase tracking-wider transition-colors ${
+          isOver ? 'text-indigo-400' : 'text-white/50'
+        }`}>TODO</span>
+        {isOver && (
+          <span className="text-[10px] text-indigo-400 animate-pulse">← upuść tutaj</span>
+        )}
+      </div>
+      <div className="flex-1 overflow-y-auto p-3">
+        <TodoSourcePanel tasks={tasks} />
+      </div>
+    </div>
+  )
+}
+
 function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
   const iconSet = useCalendarStore((s) => s.iconSet)
@@ -1037,10 +1248,44 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
     queryFn: tasksApi.list,
   })
 
+  // Pobierz wszystkie eventy żeby zbudować mapę eventId → {color, icon, title}
+  const { data: allEvents = [] } = useQuery({
+    queryKey: ['events-all'],
+    queryFn: eventsApi.listAll,
+    staleTime: 30_000,
+  })
+  const eventColorMap: EventColorMap = {}
+  allEvents.forEach((ev: Event) => {
+    eventColorMap[ev.id] = {
+      color: ev.activity_template?.color ?? ev.color ?? '#6366f1',
+      icon: ev.activity_template?.icon ?? ev.icon ?? '📅',
+      title: ev.activity_template?.name ?? ev.title,
+    }
+  })
+
   const patchMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<EisenhowerTask> }) => tasksApi.patch(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['eisenhower-tasks'] }),
   })
+
+  // Sync checkbox→task wywoływany jawnie po zapisie opisu w EventModal (nie przez useEffect)
+  // żeby uniknąć pętli: task done → opis update → allEvents refresh → useEffect → task done → ...
+  const syncTasksFromEventDescription = useCallback((eventId: number, description: string) => {
+    if (!tasks.length) return
+    const todos = parseTodoItems(description)
+    todos.forEach((todo) => {
+      const linkedTask = tasks.find(
+        (t) => t.linked_event_id === eventId && t.title.toLowerCase().trim() === todo.text.toLowerCase().trim()
+      )
+      if (!linkedTask) return
+      if (todo.checked && linkedTask.status !== 'done') {
+        patchMut.mutate({ id: linkedTask.id, data: { status: 'done' } })
+      } else if (!todo.checked && linkedTask.status === 'done') {
+        patchMut.mutate({ id: linkedTask.id, data: { status: 'todo' } })
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks])
 
   const deleteMutOverlay = useMutation({
     mutationFn: (id: number) => tasksApi.delete(id),
@@ -1080,9 +1325,12 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks])
 
+  const [activeTodoDrag, setActiveTodoDrag] = useState<TodoDragData | null>(null)
+
   const handleDragStart = (e: DragStartEvent) => {
     const d = e.active.data.current
     if (d?.type === 'eisenhower_task') setActiveTask(d.task)
+    if (d?.type === 'event_todo') setActiveTodoDrag(d as TodoDragData)
     setContextMenu(null)
   }
 
@@ -1111,13 +1359,66 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
     },
   })
 
+  // Mutacja: stwórz task z todo item i od razu przypisz do kwadrantu
+  const createFromTodo = useMutation({
+    mutationFn: (data: Parameters<typeof tasksApi.create>[0]) => tasksApi.create(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['eisenhower-tasks'] })
+      qc.invalidateQueries({ queryKey: ['events-all'] })
+    },
+  })
+
   const handleDragEndWithPending = (e: DragEndEvent) => {
     setActiveTask(null)
+    setActiveTodoDrag(null)
     const { over, active } = e
     if (!over) return
     const d = active.data.current
+
+    // ── Drag event_todo → kwadrant: stwórz nowy EisenhowerTask ──
+    if (d?.type === 'event_todo') {
+      const todo = d as TodoDragData
+      const targetQ = over.id as Quadrant
+      const flags = quadrantToFlags(targetQ)
+      createFromTodo.mutate({
+        title: todo.todoText,
+        urgent: flags.urgent,
+        important: flags.important,
+        status: 'todo',
+        linked_event_id: todo.eventId,
+      })
+      return
+    }
+
     if (d?.type !== 'eisenhower_task') return
     const task: EisenhowerTask = d.task
+
+    // ── Upuszczenie na panel TODO — odłóż task do aktywności (odznacz checkbox + usuń task) ──
+    if (over.id === 'todo-panel') {
+      // Tylko taski z linked_event_id (pochodzące z aktywności)
+      if (task.linked_event_id) {
+        // Odznacz checkbox w opisie eventu
+        const ev = allEvents.find((e: Event) => e.id === task.linked_event_id)
+        if (ev?.description) {
+          const newHtml = setTodoChecked(ev.description, task.title, false)
+          if (newHtml) {
+            eventsApi.update(task.linked_event_id, { description: newHtml })
+              .then(() => {
+                qc.invalidateQueries({ queryKey: ['events-all'] })
+                qc.invalidateQueries({ queryKey: ['events'] })
+              })
+          }
+        }
+        // Usuń task z matrycy — wróci do TODO panelu jako nieodznaczony item
+        deleteMutOverlay.mutate(task.id)
+        setPendingIds((prev) => { const s = new Set(prev); s.delete(task.id); return s })
+      } else {
+        // Task bez linked_event — po prostu cofnij do poczekalni
+        sendToPending(task)
+      }
+      return
+    }
+
     const targetQ = over.id as Quadrant
 
     // Zawsze usuwaj z poczekalni po upuszczeniu w kwadrant
@@ -1176,8 +1477,8 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
         style={{ backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)' }}
         onClick={(e) => e.target === e.currentTarget && onClose()}
       >
-        {/* Główna ramka — szersza, bo mamy dwa panele */}
-        <div className="m-auto w-full max-w-5xl max-h-[95vh] flex flex-col rounded-3xl overflow-hidden bg-gray-950 shadow-2xl border border-white/10">
+        {/* Główna ramka — trzy panele: lewy (TODO) + środek (matryca) + prawy (ukończone) */}
+        <div className="m-auto w-full max-w-6xl max-h-[95vh] flex flex-col rounded-3xl overflow-hidden bg-gray-950 shadow-2xl border border-white/10">
 
           {/* Nagłówek */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
@@ -1189,11 +1490,14 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
             >×</button>
           </div>
 
-          {/* Ciało: lewy panel (matryca) + prawy panel (ukończone) */}
+          {/* Ciało: lewy (TODO) + środek (matryca) + prawy (ukończone) */}
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEndWithPending}>
           <div className="flex flex-1 overflow-hidden">
 
-            {/* ── Lewy: matryca + poczekalnia + formularz ── */}
+            {/* ── Lewy: TODO z aktywności (dropzone — wróć task do aktywności) ── */}
+            <TodoDropZone tasks={tasks} />
+
+            {/* ── Środek: matryca + poczekalnia + formularz ── */}
               <div className="flex-1 overflow-y-auto p-5 space-y-4 min-w-0">
 
                 {/* Matryca 2×2 — rośnie z contentem */}
@@ -1206,6 +1510,7 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
                       onSendToPending={sendToPending}
                       onAddToPending={(t) => setPendingIds((prev) => new Set([...prev, t.id]))}
                       onContextMenu={openContextMenu}
+                      eventColorMap={eventColorMap}
                     />
                   ))}
                 </div>
@@ -1253,7 +1558,7 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
                 <span className="text-xs text-white/30 bg-white/5 rounded-full px-2 py-0.5">{doneTasks.length}</span>
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-                <DonePanel tasks={doneTasks} onContextMenu={openContextMenu} />
+                <DonePanel tasks={doneTasks} onContextMenu={openContextMenu} eventColorMap={eventColorMap} />
               </div>
 
               {/* Zaplanowane w czasie */}
@@ -1314,7 +1619,6 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
                 )
               })()}
 
-
             </div>
 
           </div>
@@ -1323,6 +1627,18 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
             {activeTask && (
               <div className="bg-gray-700 border border-white/20 rounded-lg shadow-2xl px-3 py-2 text-xs text-white font-medium opacity-95 cursor-grabbing">
                 {activeTask.title}
+              </div>
+            )}
+            {activeTodoDrag && (
+              <div
+                className="rounded-lg shadow-2xl px-3 py-2 text-xs font-medium opacity-95 cursor-grabbing border"
+                style={{
+                  backgroundColor: activeTodoDrag.eventColor + '33',
+                  borderColor: activeTodoDrag.eventColor + '66',
+                  color: 'rgba(255,255,255,0.9)',
+                }}
+              >
+                ☐ {activeTodoDrag.todoText}
               </div>
             )}
           </DragOverlay>
@@ -1549,18 +1865,18 @@ export function EisenhowerMatrix() {
           className={`w-full grid grid-cols-2 gap-1.5 group cursor-grab active:cursor-grabbing select-none ${isDragging ? 'opacity-50' : ''}`}
         >
           {[
-            { id: 'do_first' as Quadrant, label: 'Zrób teraz', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.35)', color: '#ef4444' },
-            { id: 'schedule' as Quadrant, label: 'Zaplanuj', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)', color: '#3b82f6' },
-            { id: 'delegate' as Quadrant, label: 'Deleguj', bg: 'rgba(234,179,8,0.12)', border: 'rgba(234,179,8,0.35)', color: '#eab308' },
-            { id: 'eliminate' as Quadrant, label: 'Eliminuj', bg: 'rgba(107,114,128,0.12)', border: 'rgba(107,114,128,0.35)', color: '#6b7280' },
+            { id: 'do_first' as Quadrant, label: 'Pilne · Ważne', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.35)', color: '#ef4444' },
+            { id: 'schedule' as Quadrant, label: 'Niepilne · Ważne', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)', color: '#3b82f6' },
+            { id: 'delegate' as Quadrant, label: 'Pilne · Nieważne', bg: 'rgba(234,179,8,0.12)', border: 'rgba(234,179,8,0.35)', color: '#eab308' },
+            { id: 'eliminate' as Quadrant, label: 'Niepilne · Nieważne', bg: 'rgba(107,114,128,0.12)', border: 'rgba(107,114,128,0.35)', color: '#6b7280' },
           ].map((q) => (
             <div
               key={q.id}
-              className="rounded-xl px-2.5 py-2 text-left transition-all group-hover:brightness-110 border"
+              className="rounded-xl px-2.5 py-2 text-left transition-all group-hover:brightness-110 border flex flex-col justify-between h-[56px]"
               style={{ backgroundColor: q.bg, borderColor: q.border }}
             >
-              <div className="text-xs font-medium" style={{ color: q.color }}>{q.label}</div>
-              <div className="text-xl font-bold leading-none mt-0.5 text-white">{countByQ(q.id)}</div>
+              <div className="text-xs font-medium leading-tight" style={{ color: q.color }}>{q.label}</div>
+              <div className="text-xl font-bold leading-none mt-1 text-white">{countByQ(q.id)}</div>
             </div>
           ))}
         </div>

@@ -5,6 +5,7 @@ import { useDroppable, useDraggable } from '@dnd-kit/core'
 import { format, addDays, subDays, startOfDay, isSameDay, parseISO, isYesterday, isToday as isTodayFn } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { eventsApi } from '../../api/events'
+import { parseTodoItems, setTodoChecked } from '../../lib/htmlUtils'
 import { contactsApi } from '../../api/contacts'
 import { useCalendarStore, DragGhost } from '../../store/calendarStore'
 import { templatesApi } from '../../api/templates'
@@ -476,10 +477,10 @@ function EventBlock({
 
 // ── Konfiguracja kolorów kwadrantów ───────────────────────────────────────────
 const QUADRANT_COLORS: Record<string, { color: string; label: string }> = {
-  do_first: { color: '#ef4444', label: 'Zrób teraz' },
-  schedule: { color: '#3b82f6', label: 'Zaplanuj' },
-  delegate: { color: '#eab308', label: 'Deleguj' },
-  eliminate: { color: '#6b7280', label: 'Eliminuj' },
+  do_first: { color: '#ef4444', label: 'Pilne · Ważne' },
+  schedule: { color: '#3b82f6', label: 'Niepilne · Ważne' },
+  delegate: { color: '#eab308', label: 'Pilne · Nieważne' },
+  eliminate: { color: '#6b7280', label: 'Niepilne · Nieważne' },
 }
 
 // ── Blok kwadrantu Eisenhowera na kalendarzu ────────────────────────────────
@@ -494,6 +495,7 @@ function EisenhowerCalendarBlock({
   rightOffset = 4,
   tasks,
   onTaskStatusChange,
+  eventColorMap,
 }: {
   event: Event
   columnRef: React.RefObject<HTMLDivElement>
@@ -505,6 +507,7 @@ function EisenhowerCalendarBlock({
   rightOffset?: number
   tasks: EisenhowerTask[]
   onTaskStatusChange: (taskId: number, newStatus: 'todo' | 'in_progress' | 'done') => void
+  eventColorMap?: Record<number, { color: string; icon: string; title: string }>
 }) {
   const quadrant = event.eisenhower_quadrant as Quadrant
   const qConfig = QUADRANT_COLORS[quadrant] || { color: '#8b5cf6', label: 'Matryca' }
@@ -704,30 +707,37 @@ function EisenhowerCalendarBlock({
         className="overflow-y-auto px-1"
         style={{ maxHeight: `${height - 24}px` }}
       >
-        {quadrantTasks.map((task) => (
-          <div
-            key={task.id}
-            className="flex items-center gap-1.5 py-1 px-1.5 my-0.5 rounded cursor-pointer hover:brightness-125 transition-all"
-            style={{
-              pointerEvents: 'all',
-              backgroundColor: qConfig.color + '28',
-              border: `1px solid ${qConfig.color}38`,
-            }}
-            onClick={(e) => {
-              e.stopPropagation()
-              cycleStatus(task)
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <StatusIcon task={task} />
-            <span
-              className="text-xs truncate"
-              style={{ color: '#ffffffcc' }}
+        {quadrantTasks.map((task) => {
+          const src = task.linked_event_id ? eventColorMap?.[task.linked_event_id] : undefined
+          return (
+            <div
+              key={task.id}
+              className="flex items-center gap-1.5 py-1 px-1.5 my-0.5 rounded cursor-pointer hover:brightness-125 transition-all"
+              style={{
+                pointerEvents: 'all',
+                backgroundColor: src ? src.color + '28' : qConfig.color + '28',
+                borderLeft: src ? `3px solid ${src.color}` : `1px solid ${qConfig.color}38`,
+                borderTop: `1px solid ${src ? src.color + '30' : qConfig.color + '30'}`,
+                borderRight: `1px solid ${src ? src.color + '30' : qConfig.color + '30'}`,
+                borderBottom: `1px solid ${src ? src.color + '30' : qConfig.color + '30'}`,
+              }}
+              title={src ? `${src.title}: ${task.title}` : task.title}
+              onClick={(e) => { e.stopPropagation(); cycleStatus(task) }}
+              onPointerDown={(e) => e.stopPropagation()}
             >
-              {task.title}
-            </span>
-          </div>
-        ))}
+              <StatusIcon task={task} />
+              {src && (
+                <IconRenderer icon={src.icon} size={10} iconSet={iconSet} />
+              )}
+              <span
+                className="text-xs truncate"
+                style={{ color: src ? src.color + 'dd' : '#ffffffcc' }}
+              >
+                {task.title}
+              </span>
+            </div>
+          )
+        })}
         {doneTasks.length > 0 && (
           <div className="mt-0.5 pt-0.5" style={{ borderTop: `1px solid ${qConfig.color}22` }}>
             <span className="text-xs" style={{ color: qConfig.color + '66' }}>
@@ -778,6 +788,7 @@ function DayColumn({
   iconSet,
   eisenhowerTasks,
   onTaskStatusChange,
+  eisenhowerEventColorMap,
 }: {
   date: Date
   dayIndex: number
@@ -794,6 +805,7 @@ function DayColumn({
   iconSet?: import('../../lib/iconSets').IconSetId
   eisenhowerTasks: EisenhowerTask[]
   onTaskStatusChange: (taskId: number, newStatus: 'todo' | 'in_progress' | 'done') => void
+  eisenhowerEventColorMap?: Record<number, { color: string; icon: string; title: string }>
 }) {
   const columnRef = useRef<HTMLDivElement>(null)
 
@@ -910,6 +922,7 @@ function DayColumn({
             rightOffset={overlaps ? BG_STRIP_WIDTH + 4 : 4}
             tasks={eisenhowerTasks}
             onTaskStatusChange={onTaskStatusChange}
+            eventColorMap={eisenhowerEventColorMap}
           />
         )
       })}
@@ -1062,6 +1075,22 @@ export function WeeklyCalendar() {
     queryFn: tasksApi.list,
   })
 
+  // Mapa eventId → {color, icon, title} — do kolorowania tasków po aktywności źródłowej
+  // Cache shared z EisenhowerMatrix (ten sam queryKey 'events-all')
+  const { data: allEventsForTaskColors = [] } = useQuery({
+    queryKey: ['events-all'],
+    queryFn: eventsApi.listAll,
+    staleTime: 30_000,
+  })
+  const eisenhowerEventColorMap: Record<number, { color: string; icon: string; title: string }> = {}
+  allEventsForTaskColors.forEach((ev: Event) => {
+    eisenhowerEventColorMap[ev.id] = {
+      color: ev.activity_template?.color ?? ev.color ?? '#6366f1',
+      icon: ev.activity_template?.icon ?? ev.icon ?? '📅',
+      title: ev.activity_template?.name ?? ev.title,
+    }
+  })
+
   const taskPatchMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<EisenhowerTask> }) =>
       tasksApi.patch(id, data),
@@ -1070,6 +1099,22 @@ export function WeeklyCalendar() {
 
   const handleTaskStatusChange = (taskId: number, newStatus: 'todo' | 'in_progress' | 'done') => {
     taskPatchMut.mutate({ id: taskId, data: { status: newStatus } })
+    // Synchronizuj checkbox w opisie eventu (zaznacz gdy done, odznacz gdy cofnięty)
+    const task = eisenhowerTasks.find((t) => t.id === taskId)
+    if (task?.linked_event_id && task.title) {
+      const allEvs = qc.getQueryData<Event[]>(['events-all'])
+      const ev = allEvs?.find((e) => e.id === task.linked_event_id)
+      if (ev?.description) {
+        const newHtml = setTodoChecked(ev.description, task.title, newStatus === 'done')
+        if (newHtml) {
+          eventsApi.update(task.linked_event_id, { description: newHtml })
+            .then(() => {
+              qc.invalidateQueries({ queryKey: ['events-all'] })
+              qc.invalidateQueries({ queryKey: ['events'] })
+            })
+        }
+      }
+    }
   }
 
   // Kontakty z urodzinami w danym dniu
@@ -1089,10 +1134,31 @@ export function WeeklyCalendar() {
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<Event> }) =>
       eventsApi.update(id, data),
-    onSuccess: () => {
+    onSuccess: (updatedEvent, { data }) => {
       qc.invalidateQueries({ queryKey: ['events'] })
-      // Dwukierunkowa sync: opis propagowany do szablonu i innych eventów
       qc.invalidateQueries({ queryKey: ['activity-templates'] })
+      // Sync checkbox→task: jeśli opis się zmienił, zaktualizuj statusy tasków w matrycy
+      if (data.description !== undefined) {
+        qc.invalidateQueries({ queryKey: ['events-all'] })
+        // Pobierz taski z cache i zsynchronizuj statusy
+        const tasks = qc.getQueryData<EisenhowerTask[]>(['eisenhower-tasks']) ?? []
+        if (tasks.length && data.description) {
+          parseTodoItems(data.description).forEach((todo: { text: string; checked: boolean }) => {
+            const linked = tasks.find(
+              (t) => t.linked_event_id === updatedEvent.id &&
+                     t.title.toLowerCase().trim() === todo.text.toLowerCase().trim()
+            )
+            if (!linked) return
+            if (todo.checked && linked.status !== 'done') {
+              tasksApi.patch(linked.id, { status: 'done' })
+                .then(() => qc.invalidateQueries({ queryKey: ['eisenhower-tasks'] }))
+            } else if (!todo.checked && linked.status === 'done') {
+              tasksApi.patch(linked.id, { status: 'todo' })
+                .then(() => qc.invalidateQueries({ queryKey: ['eisenhower-tasks'] }))
+            }
+          })
+        }
+      }
     },
   })
 
@@ -1249,6 +1315,7 @@ export function WeeklyCalendar() {
                 }}
                 eisenhowerTasks={eisenhowerTasks}
                 onTaskStatusChange={handleTaskStatusChange}
+                eisenhowerEventColorMap={eisenhowerEventColorMap}
               />
             ))}
           </div>

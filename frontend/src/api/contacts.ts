@@ -20,4 +20,13 @@ export const contactsApi = {
   delete: async (id: number): Promise<void> => {
     await api.delete(`/contacts/${id}`)
   },
+
+  uploadPhoto: async (id: number, file: File): Promise<Contact> => {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await api.post<Contact>(`/contacts/${id}/photo`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data
+  },
 }

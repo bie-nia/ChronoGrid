@@ -10,6 +10,12 @@ export const eventsApi = {
     return res.data
   },
 
+  // Pobierz wszystkie eventy użytkownika (bez filtra dat) — dla TODO panel w Eisenhower
+  listAll: async (): Promise<Event[]> => {
+    const res = await api.get<Event[]>('/events')
+    return res.data
+  },
+
   create: async (data: Partial<Event>): Promise<Event> => {
     const res = await api.post<Event>('/events', data)
     return res.data

@@ -14,6 +14,7 @@ class Contact(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    interests: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     birthday: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     photo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)

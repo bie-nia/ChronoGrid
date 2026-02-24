@@ -50,6 +50,7 @@ export interface Contact {
   name: string
   phone?: string
   notes?: string
+  interests?: string
   birthday?: string   // ISO date "YYYY-MM-DD"
   photo_url?: string
   user_id: number

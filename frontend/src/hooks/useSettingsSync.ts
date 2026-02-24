@@ -10,7 +10,7 @@ import { useAuthStore } from '../store/authStore'
  * - przy zmianie ustawień w store: debounce 800ms, potem PUT /settings
  */
 export function useSettingsSync() {
-  const token = useAuthStore((s) => s.token)
+  const token = useAuthStore((s) => s.accessToken)
   const {
     scrollMode, viewMode, firstDayOfWeek, hourStart, hourEnd,
     setScrollMode, setViewMode, setFirstDayOfWeek, setHourStart, setHourEnd,

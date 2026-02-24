@@ -5,6 +5,11 @@ import { ICON_SETS } from '../../lib/iconSets'
 import { IconRenderer, formatIconId } from '../ui/IconRenderer'
 import { changePassword } from '../../api/auth'
 
+async function sha256(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 const HOUR_OPTIONS = Array.from({ length: 25 }, (_, i) => i) // 0–24
 
 export function SettingsOverlay({ onClose }: { onClose: () => void }) {
@@ -14,10 +19,45 @@ export function SettingsOverlay({ onClose }: { onClose: () => void }) {
     hourStart, setHourStart,
     hourEnd, setHourEnd,
     hideContactNotes, setHideContactNotes,
+    contactPinHash, setContactPinHash,
     iconSet, setIconSet,
   } = useCalendarStore()
 
   const [hoursExpanded, setHoursExpanded] = useState(false)
+  const [pwExpanded, setPwExpanded] = useState(false)
+
+  // PIN prywatności
+  const [pinMode, setPinMode] = useState<'idle' | 'set' | 'verify-change' | 'verify-remove'>('idle')
+  const [pinInput, setPinInput] = useState('')
+  const [pinNew, setPinNew] = useState('')
+  const [pinConfirm, setPinConfirm] = useState('')
+  const [pinError, setPinError] = useState<string | null>(null)
+
+  async function handleSetPin() {
+    setPinError(null)
+    if (pinNew.length < 4) { setPinError('Minimum 4 znaki'); return }
+    if (pinNew !== pinConfirm) { setPinError('PIN-y nie są identyczne'); return }
+    const hash = await sha256(pinNew)
+    setContactPinHash(hash)
+    setHideContactNotes(true)
+    setPinMode('idle'); setPinNew(''); setPinConfirm('')
+  }
+
+  async function handleVerifyThenChange() {
+    setPinError(null)
+    const hash = await sha256(pinInput)
+    if (hash !== contactPinHash) { setPinError('Nieprawidłowy PIN'); return }
+    setPinInput(''); setPinMode('set')
+  }
+
+  async function handleVerifyThenRemove() {
+    setPinError(null)
+    const hash = await sha256(pinInput)
+    if (hash !== contactPinHash) { setPinError('Nieprawidłowy PIN'); return }
+    setContactPinHash(null)
+    setHideContactNotes(false)
+    setPinMode('idle'); setPinInput('')
+  }
 
   // Zmiana hasła
   const [pwCurrent, setPwCurrent] = useState('')
@@ -275,62 +315,147 @@ export function SettingsOverlay({ onClose }: { onClose: () => void }) {
           {/* ── Prywatność ── */}
           <section>
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Prywatność</h3>
-            <button
-              onClick={() => setHideContactNotes(!hideContactNotes)}
-              className={`w-full flex items-start gap-4 px-4 py-3 rounded-xl border-2 transition-all text-left ${
-                hideContactNotes
-                  ? 'border-indigo-500 bg-indigo-50'
-                  : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <span className="text-2xl shrink-0 mt-0.5">📌</span>
+
+            {/* Status + przyciski akcji */}
+            <div className={`flex items-start gap-4 px-4 py-3 rounded-xl border-2 ${contactPinHash ? 'border-indigo-500 bg-indigo-50' : 'border-gray-100 bg-gray-50'}`}>
+              <span className="text-2xl shrink-0 mt-0.5">{contactPinHash ? '🔒' : '🔓'}</span>
               <div className="flex-1 min-w-0">
-                <div className={`font-semibold text-sm ${hideContactNotes ? 'text-indigo-700' : 'text-gray-800'}`}>
-                  Ukryj notatki kontaktów za pinem {hideContactNotes && '✓'}
+                <div className={`font-semibold text-sm ${contactPinHash ? 'text-indigo-700' : 'text-gray-700'}`}>
+                  {contactPinHash ? 'Notatki i zainteresowania chronione PINem ✓' : 'Brak blokady prywatności'}
                 </div>
                 <div className="text-xs text-gray-400 mt-0.5 leading-snug">
-                  Notatki w Bestiariuszu będą widoczne dopiero po kliknięciu 📌
+                  {contactPinHash
+                    ? 'Notatki i zainteresowania kontaktów są ukryte za PINem'
+                    : 'Ustaw PIN aby chronić notatki i zainteresowania kontaktów'}
+                </div>
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {!contactPinHash ? (
+                    <button
+                      onClick={() => { setPinMode('set'); setPinError(null); setPinNew(''); setPinConfirm('') }}
+                      className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 font-medium transition-colors"
+                    >
+                      Ustaw PIN
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => { setPinMode('verify-change'); setPinError(null); setPinInput('') }}
+                        className="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 font-medium transition-colors"
+                      >
+                        Zmień PIN
+                      </button>
+                      <button
+                        onClick={() => { setPinMode('verify-remove'); setPinError(null); setPinInput('') }}
+                        className="text-xs bg-red-50 hover:bg-red-100 text-red-600 rounded-lg px-3 py-1.5 font-medium transition-colors"
+                      >
+                        Usuń PIN
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
-            </button>
+            </div>
+
+            {/* Formularze PIN — inline pod statusem */}
+            {pinMode === 'set' && (
+              <div className="mt-3 space-y-2 p-3 rounded-xl border border-gray-200 bg-white">
+                <p className="text-xs font-semibold text-gray-600">Ustaw nowy PIN lub hasło</p>
+                <input
+                  type="password"
+                  placeholder="Nowy PIN (min. 4 znaki)"
+                  value={pinNew}
+                  onChange={e => { setPinNew(e.target.value); setPinError(null) }}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  autoFocus
+                />
+                <input
+                  type="password"
+                  placeholder="Powtórz PIN"
+                  value={pinConfirm}
+                  onChange={e => { setPinConfirm(e.target.value); setPinError(null) }}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  onKeyDown={e => e.key === 'Enter' && handleSetPin()}
+                />
+                {pinError && <p className="text-xs text-red-500">{pinError}</p>}
+                <div className="flex gap-2">
+                  <button onClick={handleSetPin} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-1.5 text-xs font-semibold transition-colors">Zapisz PIN</button>
+                  <button onClick={() => setPinMode('idle')} className="px-3 text-xs text-gray-400 hover:text-gray-600 transition-colors">Anuluj</button>
+                </div>
+              </div>
+            )}
+
+            {(pinMode === 'verify-change' || pinMode === 'verify-remove') && (
+              <div className="mt-3 space-y-2 p-3 rounded-xl border border-gray-200 bg-white">
+                <p className="text-xs font-semibold text-gray-600">
+                  {pinMode === 'verify-change' ? 'Podaj obecny PIN aby go zmienić' : 'Podaj PIN aby go usunąć'}
+                </p>
+                <input
+                  type="password"
+                  placeholder="Obecny PIN"
+                  value={pinInput}
+                  onChange={e => { setPinInput(e.target.value); setPinError(null) }}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  autoFocus
+                  onKeyDown={e => e.key === 'Enter' && (pinMode === 'verify-change' ? handleVerifyThenChange() : handleVerifyThenRemove())}
+                />
+                {pinError && <p className="text-xs text-red-500">{pinError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={pinMode === 'verify-change' ? handleVerifyThenChange : handleVerifyThenRemove}
+                    className={`flex-1 text-white rounded-lg py-1.5 text-xs font-semibold transition-colors ${pinMode === 'verify-remove' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                  >
+                    {pinMode === 'verify-change' ? 'Dalej' : 'Usuń PIN'}
+                  </button>
+                  <button onClick={() => setPinMode('idle')} className="px-3 text-xs text-gray-400 hover:text-gray-600 transition-colors">Anuluj</button>
+                </div>
+              </div>
+            )}
           </section>
 
 
           {/* ── Zmiana hasła ── */}
           <section>
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Zmiana hasła</h3>
-            <div className="space-y-2">
-              <input
-                type="password"
-                placeholder="Aktualne hasło"
-                value={pwCurrent}
-                onChange={e => setPwCurrent(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              />
-              <input
-                type="password"
-                placeholder="Nowe hasło (min. 8 zn., wielka litera, cyfra, znak specjalny)"
-                value={pwNew}
-                onChange={e => setPwNew(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              />
-              <input
-                type="password"
-                placeholder="Powtórz nowe hasło"
-                value={pwConfirm}
-                onChange={e => setPwConfirm(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              />
-              {pwError && <p className="text-xs text-red-500">{pwError}</p>}
-              {pwSuccess && <p className="text-xs text-green-600">Hasło zostało zmienione.</p>}
-              <button
-                onClick={handleChangePassword}
-                disabled={pwLoading || !pwCurrent || !pwNew || !pwConfirm}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl py-2 text-sm font-semibold transition-colors"
-              >
-                {pwLoading ? 'Zapisywanie…' : 'Zmień hasło'}
-              </button>
-            </div>
+            <button
+              onClick={() => setPwExpanded(v => !v)}
+              className="w-full flex items-center justify-between text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors"
+            >
+              <span>Zmiana hasła</span>
+              <span className="text-base leading-none">{pwExpanded ? '▲' : '▼'}</span>
+            </button>
+            {pwExpanded && (
+              <div className="space-y-2 mt-3">
+                <input
+                  type="password"
+                  placeholder="Aktualne hasło"
+                  value={pwCurrent}
+                  onChange={e => setPwCurrent(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <input
+                  type="password"
+                  placeholder="Nowe hasło (min. 8 zn., wielka litera, cyfra, znak specjalny)"
+                  value={pwNew}
+                  onChange={e => setPwNew(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <input
+                  type="password"
+                  placeholder="Powtórz nowe hasło"
+                  value={pwConfirm}
+                  onChange={e => setPwConfirm(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                {pwError && <p className="text-xs text-red-500">{pwError}</p>}
+                {pwSuccess && <p className="text-xs text-green-600">Hasło zostało zmienione.</p>}
+                <button
+                  onClick={handleChangePassword}
+                  disabled={pwLoading || !pwCurrent || !pwNew || !pwConfirm}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl py-2 text-sm font-semibold transition-colors"
+                >
+                  {pwLoading ? 'Zapisywanie…' : 'Zmień hasło'}
+                </button>
+              </div>
+            )}
           </section>
 
         </div>

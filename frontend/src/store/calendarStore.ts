@@ -40,6 +40,7 @@ interface CalendarState {
   hourStart: number   // godzina początku dnia (0-23)
   hourEnd: number     // godzina końca dnia (1-24)
   hideContactNotes: boolean  // ukryj notatki kontaktu za pinem
+  contactPinHash: string | null  // SHA-256 hash PINu/hasła (null = brak blokady)
   iconSet: IconSetId         // aktywna biblioteka ikon
   templateOrder: number[]    // kolejność aktywności (tablica ID)
 
@@ -57,6 +58,7 @@ interface CalendarState {
   setHourStart: (h: number) => void
   setHourEnd: (h: number) => void
   setHideContactNotes: (v: boolean) => void
+  setContactPinHash: (hash: string | null) => void
   setIconSet: (id: IconSetId) => void
   setTemplateOrder: (ids: number[]) => void
 }
@@ -73,6 +75,7 @@ export const useCalendarStore = create<CalendarState>()(
       hourStart: 8,
       hourEnd: 22,
       hideContactNotes: false,
+      contactPinHash: null,
       iconSet: 'emoji' as IconSetId,
       templateOrder: [],
 
@@ -103,6 +106,7 @@ export const useCalendarStore = create<CalendarState>()(
       setHourStart: (h) => set({ hourStart: h }),
       setHourEnd: (h) => set({ hourEnd: h }),
       setHideContactNotes: (v) => set({ hideContactNotes: v }),
+      setContactPinHash: (hash) => set({ contactPinHash: hash }),
       setIconSet: (id) => set({ iconSet: id }),
       setTemplateOrder: (ids) => set({ templateOrder: ids }),
     }),
@@ -116,6 +120,7 @@ export const useCalendarStore = create<CalendarState>()(
         hourStart: s.hourStart,
         hourEnd: s.hourEnd,
         hideContactNotes: s.hideContactNotes,
+        contactPinHash: s.contactPinHash,
         iconSet: s.iconSet,
         templateOrder: s.templateOrder,
       }),
