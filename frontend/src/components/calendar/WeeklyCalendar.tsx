@@ -2,12 +2,12 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDroppable, useDraggable } from '@dnd-kit/core'
-import { format, addDays, subDays, startOfDay, isSameDay, parseISO, isYesterday, isToday as isTodayFn } from 'date-fns'
+import { format, addDays, subDays, addMonths, subMonths, addYears, subYears, startOfDay, isSameDay, parseISO, isYesterday, isToday as isTodayFn } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { eventsApi } from '../../api/events'
 import { parseTodoItems, setTodoChecked } from '../../lib/htmlUtils'
 import { contactsApi } from '../../api/contacts'
-import { useCalendarStore, DragGhost } from '../../store/calendarStore'
+import { useCalendarStore, DragGhost, CalendarView } from '../../store/calendarStore'
 import { templatesApi } from '../../api/templates'
 import { Event, Contact, EisenhowerTask, Quadrant, getQuadrant } from '../../types'
 import { tasksApi } from '../../api/tasks'
@@ -17,6 +17,7 @@ import { SettingsOverlay } from '../ui/SettingsOverlay'
 import { AdminPanel } from '../ui/AdminPanel'
 import { BestiaryOverlay } from '../bestiary/Bestiary'
 import { getMe } from '../../api/auth'
+import { DayView, MonthView, YearView } from './CalendarViews'
 
 const HOUR_HEIGHT = 60  // px na godzinę
 
@@ -940,6 +941,7 @@ export function WeeklyCalendar() {
     viewMode,
     hourStart, hourEnd,
     iconSet,
+    calendarView, setCalendarView,
   } = useCalendarStore()
   const [modalData, setModalData] = useState<{
     mode: 'create' | 'edit'
@@ -1186,23 +1188,60 @@ export function WeeklyCalendar() {
       <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-3 border-b border-gray-100 shrink-0">
         {/* Lewa strona — pusty spacer */}
         <div />
-        {/* Środek — nawigacja tygodnia */}
+        {/* Środek — nawigacja (zależna od aktywnego widoku) */}
         <div className="flex items-center gap-1">
           <button
-            onClick={() => visibleDaysCount < 7 ? setWeekStart(subDays(daysStart, visibleDaysCount)) : prevWeek()}
+            onClick={() => {
+              if (calendarView === 'day') setWeekStart(subDays(weekStart, 1))
+              else if (calendarView === 'month') setWeekStart(subMonths(weekStart, 1))
+              else if (calendarView === 'year') setWeekStart(subYears(weekStart, 1))
+              else if (visibleDaysCount < 7) setWeekStart(subDays(daysStart, visibleDaysCount))
+              else prevWeek()
+            }}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 text-lg font-light shrink-0"
           >‹</button>
           <span className="font-semibold text-gray-800 text-sm w-[210px] text-center shrink-0">
-            {format(daysStart, 'd MMMM', { locale: pl })} –{' '}
-            {format(addDays(daysStart, visibleDaysCount - 1), 'd MMMM yyyy', { locale: pl })}
+            {calendarView === 'day' && format(weekStart, 'EEEE, d MMMM yyyy', { locale: pl })}
+            {calendarView === 'week' && (
+              <>
+                {format(daysStart, 'd MMMM', { locale: pl })} –{' '}
+                {format(addDays(daysStart, visibleDaysCount - 1), 'd MMMM yyyy', { locale: pl })}
+              </>
+            )}
+            {calendarView === 'month' && (
+              <span className="capitalize">{format(weekStart, 'LLLL yyyy', { locale: pl })}</span>
+            )}
+            {calendarView === 'year' && format(weekStart, 'yyyy')}
           </span>
           <button
-            onClick={() => visibleDaysCount < 7 ? setWeekStart(addDays(daysStart, visibleDaysCount)) : nextWeek()}
+            onClick={() => {
+              if (calendarView === 'day') setWeekStart(addDays(weekStart, 1))
+              else if (calendarView === 'month') setWeekStart(addMonths(weekStart, 1))
+              else if (calendarView === 'year') setWeekStart(addYears(weekStart, 1))
+              else if (visibleDaysCount < 7) setWeekStart(addDays(daysStart, visibleDaysCount))
+              else nextWeek()
+            }}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 text-lg font-light shrink-0"
           >›</button>
         </div>
         {/* Prawa strona — przyciski */}
         <div className="flex items-center gap-2 justify-end">
+          {/* Przełącznik widoków */}
+          <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+            {(['day', 'week', 'month', 'year'] as CalendarView[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => setCalendarView(v)}
+                className={`px-2.5 py-1.5 transition-colors ${
+                  calendarView === v
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                {{ day: 'Dzień', week: 'Tydzień', month: 'Miesiąc', year: 'Rok' }[v]}
+              </button>
+            ))}
+          </div>
           <button
             onClick={goToToday}
             className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
@@ -1230,7 +1269,31 @@ export function WeeklyCalendar() {
         </div>
       </div>
 
-      {/* Scrollowalny kontener — zawiera i nagłówki i body */}
+      {/* Widok dzienny */}
+      {calendarView === 'day' && (
+        <DayView
+          anchorDate={weekStart}
+        />
+      )}
+
+      {/* Widok miesięczny */}
+      {calendarView === 'month' && (
+        <MonthView
+          anchorDate={weekStart}
+          onDayClick={(d) => { setWeekStart(d); setCalendarView('day') }}
+        />
+      )}
+
+      {/* Widok roczny */}
+      {calendarView === 'year' && (
+        <YearView
+          anchorDate={weekStart}
+          onDayClick={(d) => { setWeekStart(d); setCalendarView('month') }}
+        />
+      )}
+
+      {/* Widok tygodniowy (domyslny) */}
+      {calendarView === 'week' && (
       <div
         ref={scrollContainerRef}
         className="flex-1 min-h-0 overflow-auto"
@@ -1322,6 +1385,7 @@ export function WeeklyCalendar() {
 
         </div>
       </div>
+      )} {/* koniec calendarView === 'week' */}
 
       {/* Modal */}
       {modalData && (

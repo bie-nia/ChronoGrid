@@ -48,7 +48,7 @@ def list_events(
             start = datetime.fromisoformat(week_start).replace(tzinfo=timezone.utc)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid week_start format")
-        num_days = max(1, min(days, 31)) if days else 7
+        num_days = max(1, min(days, 366)) if days else 7
         end = start + timedelta(days=num_days)
         q = q.filter(Event.start_datetime >= start, Event.start_datetime < end)
     return q.order_by(Event.start_datetime).all()

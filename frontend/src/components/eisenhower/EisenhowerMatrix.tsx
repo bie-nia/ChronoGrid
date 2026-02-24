@@ -36,7 +36,7 @@ interface QuadrantConfig {
 const QUADRANTS: QuadrantConfig[] = [
   {
     id: 'do_first',
-    label: 'Zrób teraz',
+    label: 'Pilne · Ważne',
     urgentLabel: 'Pilne',
     importantLabel: 'Ważne',
     bg: 'bg-red-900/80',
@@ -48,7 +48,7 @@ const QUADRANTS: QuadrantConfig[] = [
   },
   {
     id: 'schedule',
-    label: 'Zaplanuj',
+    label: 'Niepilne · Ważne',
     urgentLabel: 'Niepilne',
     importantLabel: 'Ważne',
     bg: 'bg-blue-900/80',
@@ -60,7 +60,7 @@ const QUADRANTS: QuadrantConfig[] = [
   },
   {
     id: 'delegate',
-    label: 'Deleguj',
+    label: 'Pilne · Nieważne',
     urgentLabel: 'Pilne',
     importantLabel: 'Nieważne',
     bg: 'bg-yellow-900/80',
@@ -72,7 +72,7 @@ const QUADRANTS: QuadrantConfig[] = [
   },
   {
     id: 'eliminate',
-    label: 'Eliminuj',
+    label: 'Niepilne · Nieważne',
     urgentLabel: 'Niepilne',
     importantLabel: 'Nieważne',
     bg: 'bg-gray-800/80',
@@ -765,10 +765,10 @@ function TaskRecurModal({
   }, [onClose])
 
   const QUADRANT_BTNS = [
-    { id: 'do_first' as Quadrant, label: 'Zrób teraz', sub: 'Pilne · Ważne', color: 'border-red-700 text-red-300', active: 'bg-red-700/60 border-red-500 text-red-100' },
-    { id: 'schedule' as Quadrant, label: 'Zaplanuj', sub: 'Niepilne · Ważne', color: 'border-blue-700 text-blue-300', active: 'bg-blue-700/60 border-blue-500 text-blue-100' },
-    { id: 'delegate' as Quadrant, label: 'Deleguj', sub: 'Pilne · Nieważne', color: 'border-yellow-700 text-yellow-300', active: 'bg-yellow-700/60 border-yellow-500 text-yellow-100' },
-    { id: 'eliminate' as Quadrant, label: 'Eliminuj', sub: 'Niepilne · Nieważne', color: 'border-gray-600 text-gray-400', active: 'bg-gray-700/60 border-gray-500 text-gray-200' },
+    { id: 'do_first' as Quadrant, label: 'Pilne · Ważne', sub: '', color: 'border-red-700 text-red-300', active: 'bg-red-700/60 border-red-500 text-red-100' },
+    { id: 'schedule' as Quadrant, label: 'Niepilne · Ważne', sub: '', color: 'border-blue-700 text-blue-300', active: 'bg-blue-700/60 border-blue-500 text-blue-100' },
+    { id: 'delegate' as Quadrant, label: 'Pilne · Nieważne', sub: '', color: 'border-yellow-700 text-yellow-300', active: 'bg-yellow-700/60 border-yellow-500 text-yellow-100' },
+    { id: 'eliminate' as Quadrant, label: 'Niepilne · Nieważne', sub: '', color: 'border-gray-600 text-gray-400', active: 'bg-gray-700/60 border-gray-500 text-gray-200' },
   ]
 
   const DAY_PRESETS = [
@@ -855,7 +855,7 @@ function TaskRecurModal({
                 }`}
               >
                 <p className="text-sm font-semibold">{q.label}</p>
-                <p className="text-xs opacity-60">{q.sub}</p>
+                {q.sub && <p className="text-xs opacity-60">{q.sub}</p>}
               </button>
             ))}
           </div>

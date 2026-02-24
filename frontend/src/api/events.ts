@@ -16,6 +16,18 @@ export const eventsApi = {
     return res.data
   },
 
+  // Pobierz eventy dla widoku miesiąca (month_start = pierwszy dzień miesiąca, days=42 = 6 tygodni)
+  listMonth: async (monthStart: string): Promise<Event[]> => {
+    const res = await api.get<Event[]>('/events', { params: { week_start: monthStart, days: 42 } })
+    return res.data
+  },
+
+  // Pobierz eventy dla widoku roku (year_start = 1 stycznia, days=366)
+  listYear: async (yearStart: string): Promise<Event[]> => {
+    const res = await api.get<Event[]>('/events', { params: { week_start: yearStart, days: 366 } })
+    return res.data
+  },
+
   create: async (data: Partial<Event>): Promise<Event> => {
     const res = await api.post<Event>('/events', data)
     return res.data

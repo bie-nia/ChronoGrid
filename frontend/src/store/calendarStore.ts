@@ -14,6 +14,7 @@ export interface DragGhost {
 }
 
 export type ScrollMode = 'vertical' | 'horizontal'
+export type CalendarView = 'week' | 'day' | 'month' | 'year'
 
 /** Dynamiczny: zawsze zaczyna od wczoraj (dzień względem dziś)
  *  Statyczny: klasyczny tydzień z wybranym pierwszym dniem */
@@ -39,6 +40,7 @@ interface CalendarState {
   firstDayOfWeek: FirstDayOfWeek
   hourStart: number   // godzina początku dnia (0-23)
   hourEnd: number     // godzina końca dnia (1-24)
+  calendarView: CalendarView // aktywny widok kalendarza
   hideContactNotes: boolean  // ukryj notatki kontaktu za pinem
   contactPinHash: string | null  // SHA-256 hash PINu/hasła (null = brak blokady)
   iconSet: IconSetId         // aktywna biblioteka ikon
@@ -57,6 +59,7 @@ interface CalendarState {
   setFirstDayOfWeek: (day: FirstDayOfWeek) => void
   setHourStart: (h: number) => void
   setHourEnd: (h: number) => void
+  setCalendarView: (view: CalendarView) => void
   setHideContactNotes: (v: boolean) => void
   setContactPinHash: (hash: string | null) => void
   setIconSet: (id: IconSetId) => void
@@ -74,6 +77,7 @@ export const useCalendarStore = create<CalendarState>()(
       firstDayOfWeek: 1,
       hourStart: 8,
       hourEnd: 22,
+      calendarView: 'week' as CalendarView,
       hideContactNotes: false,
       contactPinHash: null,
       iconSet: 'emoji' as IconSetId,
@@ -105,6 +109,7 @@ export const useCalendarStore = create<CalendarState>()(
         })),
       setHourStart: (h) => set({ hourStart: h }),
       setHourEnd: (h) => set({ hourEnd: h }),
+      setCalendarView: (view) => set({ calendarView: view }),
       setHideContactNotes: (v) => set({ hideContactNotes: v }),
       setContactPinHash: (hash) => set({ contactPinHash: hash }),
       setIconSet: (id) => set({ iconSet: id }),
@@ -119,6 +124,7 @@ export const useCalendarStore = create<CalendarState>()(
         firstDayOfWeek: s.firstDayOfWeek,
         hourStart: s.hourStart,
         hourEnd: s.hourEnd,
+        calendarView: s.calendarView,
         hideContactNotes: s.hideContactNotes,
         contactPinHash: s.contactPinHash,
         iconSet: s.iconSet,
