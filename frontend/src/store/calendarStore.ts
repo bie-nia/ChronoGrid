@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { startOfWeek, addWeeks, subWeeks, addDays, subDays } from 'date-fns'
 import type { IconSetId } from '../lib/iconSets'
+import type { Event } from '../types'
 
 // Ghost — podgląd eventu podczas dragu
 export interface DragGhost {
@@ -14,7 +15,34 @@ export interface DragGhost {
 }
 
 export type ScrollMode = 'vertical' | 'horizontal'
-export type CalendarView = 'week' | 'day' | 'month' | 'year'
+export type CalendarView = 'week' | 'month' | 'year'
+
+// ── Undo stack ────────────────────────────────────────────────────────────────
+
+export type UndoAction =
+  | { type: 'create';  eventId: number }                            // cofnięcie = delete
+  | { type: 'update';  eventId: number; before: Partial<Event> }   // cofnięcie = update z before
+  | { type: 'delete';  event: Event }                              // cofnięcie = create
+
+const MAX_UNDO = 20
+
+interface UndoState {
+  stack: UndoAction[]
+  push: (action: UndoAction) => void
+  pop: () => UndoAction | undefined
+}
+
+export const useUndoStore = create<UndoState>()((set, get) => ({
+  stack: [],
+  push: (action) =>
+    set((s) => ({ stack: [action, ...s.stack].slice(0, MAX_UNDO) })),
+  pop: () => {
+    const [head, ...rest] = get().stack
+    if (!head) return undefined
+    set({ stack: rest })
+    return head
+  },
+}))
 
 /** Dynamiczny: zawsze zaczyna od wczoraj (dzień względem dziś)
  *  Statyczny: klasyczny tydzień z wybranym pierwszym dniem */
@@ -134,6 +162,8 @@ export const useCalendarStore = create<CalendarState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.weekStart = computeWeekStart(state.viewMode, state.firstDayOfWeek)
+          // Widok dzienny został usunięty — cofnij do tygodniowego
+          if ((state.calendarView as string) === 'day') state.calendarView = 'week'
         }
       },
     }

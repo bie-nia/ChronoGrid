@@ -7,7 +7,7 @@ import { pl } from 'date-fns/locale'
 import { eventsApi } from '../../api/events'
 import { parseTodoItems, setTodoChecked } from '../../lib/htmlUtils'
 import { contactsApi } from '../../api/contacts'
-import { useCalendarStore, DragGhost, CalendarView } from '../../store/calendarStore'
+import { useCalendarStore, DragGhost, CalendarView, useUndoStore } from '../../store/calendarStore'
 import { templatesApi } from '../../api/templates'
 import { Event, Contact, EisenhowerTask, Quadrant, getQuadrant } from '../../types'
 import { tasksApi } from '../../api/tasks'
@@ -17,7 +17,7 @@ import { SettingsOverlay } from '../ui/SettingsOverlay'
 import { AdminPanel } from '../ui/AdminPanel'
 import { BestiaryOverlay } from '../bestiary/Bestiary'
 import { getMe } from '../../api/auth'
-import { DayView, MonthView, YearView } from './CalendarViews'
+import { MonthView, YearView } from './CalendarViews'
 
 const HOUR_HEIGHT = 60  // px na godzinę
 
@@ -943,6 +943,7 @@ export function WeeklyCalendar() {
     iconSet,
     calendarView, setCalendarView,
   } = useCalendarStore()
+  const { push: undoPush, pop: undoPop } = useUndoStore()
   const [modalData, setModalData] = useState<{
     mode: 'create' | 'edit'
     event?: Event
@@ -1130,13 +1131,17 @@ export function WeeklyCalendar() {
 
   const createMut = useMutation({
     mutationFn: eventsApi.create,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
+    onSuccess: (created) => {
+      undoPush({ type: 'create', eventId: created.id })
+      qc.invalidateQueries({ queryKey: ['events'] })
+    },
   })
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Event> }) =>
+    mutationFn: ({ id, data, before }: { id: number; data: Partial<Event>; before?: Partial<Event> }) =>
       eventsApi.update(id, data),
-    onSuccess: (updatedEvent, { data }) => {
+    onSuccess: (updatedEvent, { id, data, before }) => {
+      if (before) undoPush({ type: 'update', eventId: id, before })
       qc.invalidateQueries({ queryKey: ['events'] })
       qc.invalidateQueries({ queryKey: ['activity-templates'] })
       // Sync checkbox→task: jeśli opis się zmienił, zaktualizuj statusy tasków w matrycy
@@ -1182,6 +1187,30 @@ export function WeeklyCalendar() {
   const eventsByDay = (day: Date) =>
     events.filter((e) => isSameDay(parseISO(e.start_datetime), day))
 
+  // ── Ctrl+Z — cofanie ostatniej akcji ────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key !== 'z') return
+      // Nie cofaj gdy user pisze w polu tekstowym
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return
+      e.preventDefault()
+      const action = undoPop()
+      if (!action) return
+      if (action.type === 'create') {
+        await eventsApi.delete(action.eventId)
+      } else if (action.type === 'update') {
+        await eventsApi.update(action.eventId, action.before)
+      } else if (action.type === 'delete') {
+        const { id: _id, ...rest } = action.event
+        await eventsApi.create(rest as Parameters<typeof eventsApi.create>[0])
+      }
+      qc.invalidateQueries({ queryKey: ['events'] })
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [undoPop, qc])
+
   return (
     <div ref={calendarWrapRef} className="flex flex-col h-full min-h-0 bg-white">
       {/* Nawigacja — wycentrowana */}
@@ -1192,8 +1221,7 @@ export function WeeklyCalendar() {
         <div className="flex items-center gap-1">
           <button
             onClick={() => {
-              if (calendarView === 'day') setWeekStart(subDays(weekStart, 1))
-              else if (calendarView === 'month') setWeekStart(subMonths(weekStart, 1))
+              if (calendarView === 'month') setWeekStart(subMonths(weekStart, 1))
               else if (calendarView === 'year') setWeekStart(subYears(weekStart, 1))
               else if (visibleDaysCount < 7) setWeekStart(subDays(daysStart, visibleDaysCount))
               else prevWeek()
@@ -1201,7 +1229,6 @@ export function WeeklyCalendar() {
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 text-lg font-light shrink-0"
           >‹</button>
           <span className="font-semibold text-gray-800 text-sm w-[210px] text-center shrink-0">
-            {calendarView === 'day' && format(weekStart, 'EEEE, d MMMM yyyy', { locale: pl })}
             {calendarView === 'week' && (
               <>
                 {format(daysStart, 'd MMMM', { locale: pl })} –{' '}
@@ -1215,8 +1242,7 @@ export function WeeklyCalendar() {
           </span>
           <button
             onClick={() => {
-              if (calendarView === 'day') setWeekStart(addDays(weekStart, 1))
-              else if (calendarView === 'month') setWeekStart(addMonths(weekStart, 1))
+              if (calendarView === 'month') setWeekStart(addMonths(weekStart, 1))
               else if (calendarView === 'year') setWeekStart(addYears(weekStart, 1))
               else if (visibleDaysCount < 7) setWeekStart(addDays(daysStart, visibleDaysCount))
               else nextWeek()
@@ -1228,7 +1254,7 @@ export function WeeklyCalendar() {
         <div className="flex items-center gap-2 justify-end">
           {/* Przełącznik widoków */}
           <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
-            {(['day', 'week', 'month', 'year'] as CalendarView[]).map((v) => (
+            {(['week', 'month', 'year'] as CalendarView[]).map((v) => (
               <button
                 key={v}
                 onClick={() => setCalendarView(v)}
@@ -1238,7 +1264,7 @@ export function WeeklyCalendar() {
                     : 'text-gray-500 hover:bg-gray-50'
                 }`}
               >
-                {{ day: 'Dzień', week: 'Tydzień', month: 'Miesiąc', year: 'Rok' }[v]}
+                {{ week: 'Tydzień', month: 'Miesiąc', year: 'Rok' }[v]}
               </button>
             ))}
           </div>
@@ -1269,18 +1295,11 @@ export function WeeklyCalendar() {
         </div>
       </div>
 
-      {/* Widok dzienny */}
-      {calendarView === 'day' && (
-        <DayView
-          anchorDate={weekStart}
-        />
-      )}
-
       {/* Widok miesięczny */}
       {calendarView === 'month' && (
         <MonthView
           anchorDate={weekStart}
-          onDayClick={(d) => { setWeekStart(d); setCalendarView('day') }}
+          onDayClick={(d) => { setWeekStart(d); setCalendarView('week') }}
         />
       )}
 
@@ -1368,13 +1387,18 @@ export function WeeklyCalendar() {
                 iconSet={iconSet}
                 onEventRightClick={(ev) => setModalData({ mode: 'edit', event: ev })}
                 onEventDelete={async (ev) => {
+                  undoPush({ type: 'delete', event: ev })
                   await eventsApi.delete(ev.id)
                   qc.invalidateQueries({ queryKey: ['events'] })
                 }}
                 onEventResizeEnd={(ev, newDur) => {
                   const start = parseISO(ev.start_datetime)
                   const end = new Date(start.getTime() + newDur * 60000)
-                  updateMut.mutate({ id: ev.id, data: { end_datetime: end.toISOString() } })
+                  updateMut.mutate({
+                    id: ev.id,
+                    data: { end_datetime: end.toISOString() },
+                    before: { end_datetime: ev.end_datetime },
+                  })
                 }}
                 eisenhowerTasks={eisenhowerTasks}
                 onTaskStatusChange={handleTaskStatusChange}
@@ -1400,13 +1424,28 @@ export function WeeklyCalendar() {
             if (modalData.mode === 'create') {
               createMut.mutate(data as Parameters<typeof eventsApi.create>[0])
             } else if (modalData.event) {
-              updateMut.mutate({ id: modalData.event.id, data })
+              const ev = modalData.event
+              updateMut.mutate({
+                id: ev.id,
+                data,
+                before: {
+                  title: ev.title,
+                  start_datetime: ev.start_datetime,
+                  end_datetime: ev.end_datetime,
+                  description: ev.description,
+                  location: ev.location,
+                  color: ev.color,
+                  icon: ev.icon,
+                  activity_template_id: ev.activity_template_id,
+                },
+              })
             }
             setModalData(null)
           }}
           onDelete={
             modalData.mode === 'edit' && modalData.event
               ? async () => {
+                  undoPush({ type: 'delete', event: modalData.event! })
                   await eventsApi.delete(modalData.event!.id)
                   qc.invalidateQueries({ queryKey: ['events'] })
                   setModalData(null)

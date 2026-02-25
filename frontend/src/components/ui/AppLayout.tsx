@@ -17,7 +17,7 @@ import { ActivityTemplate, Event, Quadrant } from '../../types'
 import { eventsApi } from '../../api/events'
 import { useQuery } from '@tanstack/react-query'
 import { templatesApi } from '../../api/templates'
-import { useCalendarStore } from '../../store/calendarStore'
+import { useCalendarStore, useUndoStore } from '../../store/calendarStore'
 import { useSettingsSync } from '../../hooks/useSettingsSync'
 import { IconRenderer } from './IconRenderer'
 import { arrayMove } from '@dnd-kit/sortable'
@@ -126,6 +126,7 @@ export function AppLayout() {
   const setTemplateOrder = useCalendarStore((s) => s.setTemplateOrder)
   const hourStart = useCalendarStore((s) => s.hourStart)
   const hourEnd = useCalendarStore((s) => s.hourEnd)
+  const { push: undoPush } = useUndoStore()
 
   // Sync ustawień z backendem (pobierz przy logowaniu, zapisz przy zmianach)
   useSettingsSync()
@@ -171,13 +172,19 @@ export function AppLayout() {
 
   const createMut = useMutation({
     mutationFn: eventsApi.create,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
+    onSuccess: (created) => {
+      undoPush({ type: 'create', eventId: created.id })
+      qc.invalidateQueries({ queryKey: ['events'] })
+    },
   })
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Event> }) =>
+    mutationFn: ({ id, data, before }: { id: number; data: Partial<Event>; before?: Partial<Event> }) =>
       eventsApi.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
+    onSuccess: (_, { id, before }) => {
+      if (before) undoPush({ type: 'update', eventId: id, before })
+      qc.invalidateQueries({ queryKey: ['events'] })
+    },
   })
 
   // ── Aktualizuj ghost z refów (wołane z pointermove lub onDragOver) ──────────
@@ -333,6 +340,10 @@ export function AppLayout() {
         data: {
           start_datetime: targetDate.toISOString(),
           end_datetime: end.toISOString(),
+        },
+        before: {
+          start_datetime: event.start_datetime,
+          end_datetime: event.end_datetime,
         },
       })
     } else if (activeData?.type === 'eisenhower_widget') {

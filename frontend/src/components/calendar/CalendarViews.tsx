@@ -1,5 +1,5 @@
 /**
- * CalendarViews — widoki: dzien, miesiac, rok
+ * CalendarViews — widoki: miesiac, rok
  * Uzywane przez WeeklyCalendar gdy calendarView !== 'week'
  */
 
@@ -15,8 +15,6 @@ import { Event } from '../../types'
 import { useCalendarStore } from '../../store/calendarStore'
 import { IconRenderer } from '../ui/IconRenderer'
 
-const HOUR_HEIGHT = 60
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function eventColor(ev: Event): string {
@@ -29,76 +27,6 @@ function eventIcon(ev: Event): string {
 
 function eventTitle(ev: Event): string {
   return ev.title
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WIDOK DNIA
-// ─────────────────────────────────────────────────────────────────────────────
-export function DayView({
-  anchorDate,
-}: {
-  anchorDate: Date
-}) {
-  const { hourStart, hourEnd, iconSet } = useCalendarStore()
-  const dateStr = format(anchorDate, 'yyyy-MM-dd')
-
-  const { data: events = [] } = useQuery({
-    queryKey: ['events', dateStr, 1],
-    queryFn: () => eventsApi.list(dateStr, 1),
-  })
-
-  const dayEvents = events.filter(
-    (e) => isSameDay(parseISO(e.start_datetime), anchorDate) && !e.is_background
-  )
-
-  const hours = Array.from({ length: hourEnd - hourStart }, (_, i) => hourStart + i)
-
-  return (
-    <div className="flex-1 min-h-0 overflow-auto">
-      <div className="relative" style={{ minHeight: `${(hourEnd - hourStart) * HOUR_HEIGHT}px` }}>
-        {/* Siatka godzin */}
-        {hours.map((h) => (
-          <div
-            key={h}
-            className="absolute left-0 right-0 border-t border-gray-100"
-            style={{ top: `${(h - hourStart) * HOUR_HEIGHT}px` }}
-          >
-            <span className="absolute left-2 -top-2.5 text-[10px] text-gray-400 select-none w-8 text-right">
-              {h}:00
-            </span>
-          </div>
-        ))}
-
-        {/* Eventy */}
-        <div className="absolute left-14 right-2 top-0 bottom-0">
-          {dayEvents.map((ev) => {
-            const start = parseISO(ev.start_datetime)
-            const end = parseISO(ev.end_datetime)
-            const startH = start.getHours() + start.getMinutes() / 60
-            const endH = end.getHours() + end.getMinutes() / 60
-            const top = Math.max(0, (startH - hourStart) * HOUR_HEIGHT)
-            const height = Math.max(20, (endH - startH) * HOUR_HEIGHT)
-            const color = eventColor(ev)
-            return (
-              <div
-                key={ev.id}
-                className="absolute left-0 right-0 rounded-lg px-2 py-1 overflow-hidden"
-                style={{ top, height, backgroundColor: color + 'cc', borderLeft: `3px solid ${color}` }}
-              >
-                <div className="flex items-center gap-1">
-                  <IconRenderer icon={eventIcon(ev)} size={11} iconSet={iconSet} />
-                  <span className="text-xs font-semibold text-white truncate">{eventTitle(ev)}</span>
-                </div>
-                <div className="text-[10px] text-white/70">
-                  {format(start, 'HH:mm')}–{format(end, 'HH:mm')}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
