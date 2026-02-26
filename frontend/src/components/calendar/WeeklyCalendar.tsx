@@ -1396,6 +1396,12 @@ export function WeeklyCalendar() {
         </div>
         {/* Prawa strona — przyciski */}
         <div className="flex items-center gap-2 justify-end">
+          <button
+            onClick={goToToday}
+            className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
+          >
+            Dziś
+          </button>
           {/* Przełącznik widoków */}
           <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
             {(['week', 'month', 'year'] as CalendarView[]).map((v) => (
@@ -1412,12 +1418,6 @@ export function WeeklyCalendar() {
               </button>
             ))}
           </div>
-          <button
-            onClick={goToToday}
-            className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
-          >
-            Dziś
-          </button>
           {/* Przycisk panelu admina — widoczny tylko dla adminów */}
           {isAdmin && (
             <button
