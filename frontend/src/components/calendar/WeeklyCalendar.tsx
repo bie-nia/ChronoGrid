@@ -1350,7 +1350,7 @@ export function WeeklyCalendar() {
         {/* Lewa strona — pusty spacer */}
         <div />
         {/* Środek — nawigacja (zależna od aktywnego widoku) */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center">
           <button
             onClick={() => {
               if (calendarView === 'month') setWeekStart(subMonths(weekStart, 1))
@@ -1358,12 +1358,12 @@ export function WeeklyCalendar() {
               else if (visibleDaysCount < 7) setWeekStart(subDays(daysStart, visibleDaysCount))
               else prevWeek()
             }}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 text-lg font-light shrink-0"
+            className="w-10 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 text-lg font-light shrink-0"
           >‹</button>
           <button
             ref={datePickerBtnRef}
             onClick={() => setDatePickerOpen((o) => !o)}
-            className={`font-semibold text-gray-800 text-sm w-[210px] text-center shrink-0 transition-colors cursor-pointer rounded-lg px-2 py-1 ${datePickerOpen ? 'bg-gray-100 text-indigo-600' : 'hover:bg-gray-50 hover:text-indigo-600'}`}
+            className={`font-semibold text-gray-800 text-sm min-w-[220px] text-center shrink-0 transition-colors cursor-pointer rounded-lg px-3 py-1 ${datePickerOpen ? 'bg-gray-100 text-indigo-600' : 'hover:bg-gray-50 hover:text-indigo-600'}`}
             title="Kliknij aby przejść do daty"
           >
             {calendarView === 'week' && (
@@ -1391,7 +1391,7 @@ export function WeeklyCalendar() {
               else if (calendarView === 'year') setWeekStart(addYears(weekStart, 1))
               else navigateForward()
             }}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 text-lg font-light shrink-0"
+            className="w-10 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 text-lg font-light shrink-0"
           >›</button>
         </div>
         {/* Prawa strona — przyciski */}
