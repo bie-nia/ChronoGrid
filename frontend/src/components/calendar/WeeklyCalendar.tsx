@@ -952,6 +952,7 @@ export function WeeklyCalendar() {
   const [adminOpen, setAdminOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 })
+  const dateInputRef = useRef<HTMLInputElement>(null)
 
   // Śledź pozycję kursora podczas dragu (do pływającego tooltipa)
   useEffect(() => {
@@ -1255,7 +1256,11 @@ export function WeeklyCalendar() {
             }}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 text-lg font-light shrink-0"
           >‹</button>
-          <span className="font-semibold text-gray-800 text-sm w-[210px] text-center shrink-0">
+          <button
+            onClick={() => dateInputRef.current?.showPicker?.() ?? dateInputRef.current?.click()}
+            className="relative font-semibold text-gray-800 text-sm w-[210px] text-center shrink-0 hover:text-indigo-600 transition-colors cursor-pointer rounded-lg px-2 py-1 hover:bg-gray-50"
+            title="Kliknij aby przejść do daty"
+          >
             {calendarView === 'week' && (
               <>
                 {format(daysStart, 'd MMMM', { locale: pl })} –{' '}
@@ -1266,7 +1271,20 @@ export function WeeklyCalendar() {
               <span className="capitalize">{format(weekStart, 'LLLL yyyy', { locale: pl })}</span>
             )}
             {calendarView === 'year' && format(weekStart, 'yyyy')}
-          </span>
+            {/* Ukryty natywny date picker */}
+            <input
+              ref={dateInputRef}
+              type="date"
+              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+              value={format(weekStart, 'yyyy-MM-dd')}
+              onChange={(e) => {
+                if (!e.target.value) return
+                const picked = new Date(e.target.value + 'T00:00:00')
+                setWeekStart(picked)
+                setCalendarView('week')
+              }}
+            />
+          </button>
           <button
             onClick={() => {
               if (calendarView === 'month') setWeekStart(addMonths(weekStart, 1))
