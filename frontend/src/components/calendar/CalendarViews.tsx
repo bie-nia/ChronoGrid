@@ -77,7 +77,7 @@ export function MonthView({
       </div>
 
       {/* Siatka dni */}
-      <div className="grid grid-cols-7 flex-1 min-h-0 gap-px bg-gray-100 rounded-xl overflow-hidden">
+      <div className="grid grid-cols-7 flex-1 min-h-0 gap-1.5">
         {gridDays.map((day) => {
           const dayEvs = eventsForDay(day)
           const inMonth = isSameMonth(day, anchorDate)
@@ -89,10 +89,10 @@ export function MonthView({
             <div
               key={day.toISOString()}
               onClick={() => onDayClick(day)}
-              className={`flex flex-col p-1.5 cursor-pointer transition-colors min-h-[80px] ${
+              className={`flex flex-col p-1.5 cursor-pointer transition-colors min-h-[80px] rounded-xl border ${
                 today
-                  ? 'bg-indigo-50 hover:bg-indigo-100'
-                  : 'bg-white hover:bg-indigo-50'
+                  ? 'bg-indigo-50 hover:bg-indigo-100 border-indigo-300'
+                  : 'bg-white hover:bg-indigo-50 border-gray-100'
               } ${!inMonth ? 'opacity-40' : ''}`}
             >
               {/* Numer dnia */}
