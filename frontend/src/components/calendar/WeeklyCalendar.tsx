@@ -1131,7 +1131,8 @@ export function WeeklyCalendar() {
   // Scroll poziomy kółkiem (tilt lewo/prawo) → zmiana tygodnia
   // Scroll pionowy → normalne przewijanie godzin
   useEffect(() => {
-    const el = scrollContainerRef.current
+    // W widoku tygodniowym: scroll container; w miesiąc/rok: cały wrapper
+    const el = calendarView === 'week' ? scrollContainerRef.current : calendarWrapRef.current
     if (!el) return
 
     let lastTime = 0
@@ -1141,36 +1142,48 @@ export function WeeklyCalendar() {
         const now = Date.now()
         if (now - lastTime < 400) return
         lastTime = now
-        if (e.deltaX > 0) navigateForward()
-        else visibleDaysCount < 7 ? setWeekStart(subDays(daysStart, visibleDaysCount)) : prevWeek()
+        if (e.deltaX > 0) {
+          if (calendarView === 'month') setWeekStart(addMonths(weekStart, 1))
+          else if (calendarView === 'year') setWeekStart(addYears(weekStart, 1))
+          else navigateForward()
+        } else {
+          if (calendarView === 'month') setWeekStart(subMonths(weekStart, 1))
+          else if (calendarView === 'year') setWeekStart(subYears(weekStart, 1))
+          else visibleDaysCount < 7 ? setWeekStart(subDays(daysStart, visibleDaysCount)) : prevWeek()
+        }
       }
     }
     el.addEventListener('wheel', handler, { passive: false })
     return () => el.removeEventListener('wheel', handler)
-  }, [navigateForward, prevWeek, visibleDaysCount, daysStart, setWeekStart, calendarView])
+  }, [navigateForward, prevWeek, visibleDaysCount, daysStart, weekStart, setWeekStart, calendarView])
 
-  // Klawisze strzałek: ←/→ → tydzień, ↑/↓ → scroll godzin
+  // Klawisze strzałek: ←/→ → nawigacja, ↑/↓ → scroll godzin (tylko w widoku tygodnia)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Nie przechwytuj gdy użytkownik pisze w input/textarea
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return
 
-      const el = scrollContainerRef.current
-      if (!el) return
-
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
-        visibleDaysCount < 7 ? setWeekStart(subDays(daysStart, visibleDaysCount)) : prevWeek()
+        if (calendarView === 'month') setWeekStart(subMonths(weekStart, 1))
+        else if (calendarView === 'year') setWeekStart(subYears(weekStart, 1))
+        else visibleDaysCount < 7 ? setWeekStart(subDays(daysStart, visibleDaysCount)) : prevWeek()
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
-        navigateForward()
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        el.scrollBy({ top: -80, behavior: 'smooth' })
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        el.scrollBy({ top: 80, behavior: 'smooth' })
+        if (calendarView === 'month') setWeekStart(addMonths(weekStart, 1))
+        else if (calendarView === 'year') setWeekStart(addYears(weekStart, 1))
+        else navigateForward()
+      } else {
+        const el = scrollContainerRef.current
+        if (!el) return
+        if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          el.scrollBy({ top: -80, behavior: 'smooth' })
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          el.scrollBy({ top: 80, behavior: 'smooth' })
+        }
       }
     }
     document.addEventListener('keydown', handler)
