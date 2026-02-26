@@ -997,20 +997,24 @@ export function WeeklyCalendar() {
     : weekStart
 
   // Czy dzisiejszy dzień jest widoczny w aktualnym oknie kalendarza?
-  const todayVisible = !isTodayFn(daysStart)
-    ? today >= daysStart && today <= addDays(daysStart, visibleDaysCount - 1)
-    : true
+  const todayVisible = today >= daysStart && today <= addDays(daysStart, visibleDaysCount - 1)
 
-  // Nawigacja do przodu: jeśli w trybie dynamic i dziś jest widoczny → reset do układu domyślnego
+  // "Widok przesunięty w przeszłość" = zaczyna się wcześniej niż wczoraj (domyślny start dynamic)
+  const yesterday = subDays(today, 1)
+  const viewShiftedBack = daysStart < yesterday
+
+  // Nawigacja do przodu:
+  // jeśli w trybie dynamic, widok był przesunięty w przeszłość i dziś już jest widoczny
+  // → snap back do domyślnego układu (wczoraj jako pierwszy dzień)
   const navigateForward = useCallback(() => {
-    if (viewMode === 'dynamic' && todayVisible) {
+    if (viewMode === 'dynamic' && viewShiftedBack && todayVisible) {
       goToToday()
     } else if (visibleDaysCount < 7) {
       setWeekStart(addDays(daysStart, visibleDaysCount))
     } else {
       nextWeek()
     }
-  }, [viewMode, todayVisible, visibleDaysCount, daysStart, goToToday, setWeekStart, nextWeek])
+  }, [viewMode, viewShiftedBack, todayVisible, visibleDaysCount, daysStart, goToToday, setWeekStart, nextWeek])
 
   // Scroll poziomy kółkiem (tilt lewo/prawo) → zmiana tygodnia
   // Scroll pionowy → normalne przewijanie godzin
