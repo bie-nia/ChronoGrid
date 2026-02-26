@@ -1410,7 +1410,7 @@ export function WeeklyCalendar() {
         {/* Prawa strona — przyciski */}
         <div className="flex items-center gap-2 justify-end">
           <button
-            onClick={goToToday}
+            onClick={() => { goToToday(); setCalendarView('week') }}
             className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
           >
             Dziś
