@@ -83,24 +83,13 @@ function GhostBlock({ ghost, hourStart, iconSet }: { ghost: DragGhost; hourStart
         <IconRenderer icon={ghost.icon} size={11} iconSet={iconSet} />
         {ghost.title}
       </div>
-      {(() => {
-        const endHour = ghost.startHour + ghost.durationMin / 60
-        const timeStr =
-          `${String(Math.floor(ghost.startHour)).padStart(2,'0')}:${String(Math.round((ghost.startHour % 1) * 60)).padStart(2,'0')}` +
-          ` – ` +
-          `${String(Math.floor(endHour)).padStart(2,'0')}:${String(Math.round((endHour % 1) * 60)).padStart(2,'0')}`
-        return height > 32
-          ? (
-            <div className="text-xs opacity-60" style={{ color: ghost.color }}>{timeStr}</div>
-          ) : (
-            <div
-              className="absolute left-full top-0 ml-1.5 px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap pointer-events-none z-30"
-              style={{ backgroundColor: ghost.color, color: '#fff' }}
-            >
-              {timeStr}
-            </div>
-          )
-      })()}
+      {height > 32 && (
+        <div className="text-xs opacity-60" style={{ color: ghost.color }}>
+          {String(Math.floor(ghost.startHour)).padStart(2,'0')}:{String(Math.round((ghost.startHour % 1) * 60)).padStart(2,'0')}
+          {' – '}
+          {String(Math.floor(ghost.startHour + ghost.durationMin / 60)).padStart(2,'0')}:{String(Math.round(((ghost.startHour + ghost.durationMin / 60) % 1) * 60)).padStart(2,'0')}
+        </div>
+      )}
     </div>
   )
 }
@@ -962,6 +951,15 @@ export function WeeklyCalendar() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 })
+
+  // Śledź pozycję kursora podczas dragu (do pływającego tooltipa)
+  useEffect(() => {
+    if (!dragGhost) return
+    const handler = (e: PointerEvent) => setCursorPos({ x: e.clientX, y: e.clientY })
+    window.addEventListener('pointermove', handler)
+    return () => window.removeEventListener('pointermove', handler)
+  }, [dragGhost])
   const [bestiaryContactId, setBestiaryContactId] = useState<number | null>(null)
 
   // Pobierz info o aktualnym użytkowniku (is_admin)
@@ -1568,6 +1566,34 @@ export function WeeklyCalendar() {
             </button>
           ))}
         </div>
+      )}
+
+      {/* Pływający tooltip z godzinami podczas dragu */}
+      {dragGhost && createPortal(
+        (() => {
+          const endHour = dragGhost.startHour + dragGhost.durationMin / 60
+          const fmt = (h: number) =>
+            `${String(Math.floor(h)).padStart(2,'0')}:${String(Math.round((h % 1) * 60)).padStart(2,'0')}`
+          const durationH = Math.floor(dragGhost.durationMin / 60)
+          const durationM = dragGhost.durationMin % 60
+          const durationStr = durationH > 0
+            ? (durationM > 0 ? `${durationH}h ${durationM}m` : `${durationH}h`)
+            : `${durationM}m`
+          return (
+            <div
+              className="fixed pointer-events-none z-[200] flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold text-white shadow-xl"
+              style={{
+                left: cursorPos.x + 14,
+                top: cursorPos.y + 14,
+                backgroundColor: dragGhost.color,
+              }}
+            >
+              <span>{fmt(dragGhost.startHour)} – {fmt(endHour)}</span>
+              <span className="opacity-60 font-normal">{durationStr}</span>
+            </div>
+          )
+        })(),
+        document.body
       )}
     </div>
   )
