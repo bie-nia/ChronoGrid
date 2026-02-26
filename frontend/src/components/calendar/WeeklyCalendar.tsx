@@ -1326,7 +1326,7 @@ export function WeeklyCalendar() {
       {calendarView === 'year' && (
         <YearView
           anchorDate={weekStart}
-          onDayClick={(d) => { setWeekStart(d); setCalendarView('month') }}
+          onDayClick={(d) => { setWeekStart(d); setCalendarView('week') }}
         />
       )}
 
