@@ -156,15 +156,24 @@ function MiniMonth({
   const eventsForDay = (day: Date) =>
     events.filter((e) => isSameDay(parseISO(e.start_datetime), day) && !e.is_background)
 
+  // 5 wierszy dni + 1 wiersz nagłówków = 6 wierszy
+  const rowCount = days.length / 7  // 5
   return (
-    <div className="flex flex-col gap-0.5">
-      <div className="text-xs font-semibold text-gray-600 mb-1 text-center">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="text-xs font-semibold text-gray-600 mb-1 text-center shrink-0">
         {MONTH_NAMES_SHORT[monthIndex]}
       </div>
-      <div className="grid grid-cols-7 gap-px">
+      {/* Nagłówki dni tygodnia */}
+      <div className="grid grid-cols-7 shrink-0">
         {['P','W','S','C','Pi','So','N'].map((d) => (
-          <div key={d} className="text-center text-[8px] text-gray-300 leading-3">{d}</div>
+          <div key={d} className="text-center text-[8px] text-gray-400 pb-0.5">{d}</div>
         ))}
+      </div>
+      {/* Siatka dni — rozciąga się na całą dostępną wysokość */}
+      <div
+        className="grid grid-cols-7 flex-1 min-h-0"
+        style={{ gridTemplateRows: `repeat(${rowCount}, 1fr)` }}
+      >
         {days.map((day) => {
           const inMonth = getMonth(day) === monthIndex && getYear(day) === year
           const dayEvs = eventsForDay(day)
@@ -175,17 +184,17 @@ function MiniMonth({
             <div
               key={day.toISOString()}
               onClick={() => inMonth && onDayClick(day)}
-              className={`flex flex-col items-center ${inMonth ? 'cursor-pointer' : 'cursor-default'}`}
+              className={`flex flex-col items-center justify-center gap-px ${inMonth ? 'cursor-pointer' : 'cursor-default'}`}
             >
               {/* Numer dnia */}
-              <div className={`text-[9px] leading-4 w-4 text-center rounded-full ${
+              <div className={`text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-medium ${
                 today ? 'bg-indigo-600 text-white font-bold' :
-                inMonth ? 'text-gray-700' : 'text-gray-200'
+                inMonth ? 'text-gray-700' : 'text-gray-300'
               }`}>
                 {inMonth ? format(day, 'd') : ''}
               </div>
               {/* Kropeczki aktywnosci */}
-              <div className="flex gap-px justify-center h-1.5">
+              <div className="flex gap-px justify-center">
                 {colors.map((c, i) => (
                   <div
                     key={i}
@@ -218,11 +227,11 @@ export function YearView({
   })
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 overflow-auto p-4">
-      {/* Siatka 4x3 mini-kalendarzy */}
-      <div className="grid grid-cols-4 gap-6 flex-1">
+    <div className="flex flex-col flex-1 min-h-0 p-4">
+      {/* Siatka 4x3 mini-kalendarzy — wypełnia całą dostępną wysokość */}
+      <div className="grid grid-cols-4 grid-rows-3 gap-4 flex-1 min-h-0">
         {Array.from({ length: 12 }, (_, i) => (
-          <div key={i} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+          <div key={i} className="bg-gray-50 rounded-xl p-3 border border-gray-100 flex flex-col min-h-0">
             <MiniMonth
               year={year}
               monthIndex={i}
