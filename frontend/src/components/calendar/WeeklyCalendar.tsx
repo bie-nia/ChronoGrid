@@ -83,15 +83,24 @@ function GhostBlock({ ghost, hourStart, iconSet }: { ghost: DragGhost; hourStart
         <IconRenderer icon={ghost.icon} size={11} iconSet={iconSet} />
         {ghost.title}
       </div>
-      {height > 32 && (
-        <div className="text-xs opacity-60" style={{ color: ghost.color }}>
-          {String(Math.floor(ghost.startHour)).padStart(2, '0')}:
-          {String(Math.round((ghost.startHour % 1) * 60)).padStart(2, '0')}
-          {' '}–{' '}
-          {String(Math.floor(ghost.startHour + ghost.durationMin / 60)).padStart(2, '0')}:
-          {String(Math.round(((ghost.startHour + ghost.durationMin / 60) % 1) * 60)).padStart(2, '0')}
-        </div>
-      )}
+      {(() => {
+        const endHour = ghost.startHour + ghost.durationMin / 60
+        const timeStr =
+          `${String(Math.floor(ghost.startHour)).padStart(2,'0')}:${String(Math.round((ghost.startHour % 1) * 60)).padStart(2,'0')}` +
+          ` – ` +
+          `${String(Math.floor(endHour)).padStart(2,'0')}:${String(Math.round((endHour % 1) * 60)).padStart(2,'0')}`
+        return height > 32
+          ? (
+            <div className="text-xs opacity-60" style={{ color: ghost.color }}>{timeStr}</div>
+          ) : (
+            <div
+              className="absolute left-full top-0 ml-1.5 px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap pointer-events-none z-30"
+              style={{ backgroundColor: ghost.color, color: '#fff' }}
+            >
+              {timeStr}
+            </div>
+          )
+      })()}
     </div>
   )
 }
