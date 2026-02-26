@@ -187,7 +187,7 @@ function MiniMonth({
               className={`flex flex-col items-center justify-center gap-px ${inMonth ? 'cursor-pointer' : 'cursor-default'}`}
             >
               {/* Numer dnia */}
-              <div className={`text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-medium ${
+              <div className={`text-sm w-6 h-6 flex items-center justify-center rounded-full font-medium ${
                 today ? 'bg-indigo-600 text-white font-bold' :
                 inMonth ? 'text-gray-700' : 'text-gray-300'
               }`}>
