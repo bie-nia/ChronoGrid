@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDroppable, useDraggable } from '@dnd-kit/core'
-import { format, addDays, subDays, addMonths, subMonths, addYears, subYears, startOfDay, isSameDay, parseISO, isYesterday, isToday as isTodayFn } from 'date-fns'
+import { format, addDays, subDays, addMonths, subMonths, addYears, subYears, startOfDay, startOfMonth, startOfWeek, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, parseISO, isYesterday, isToday as isTodayFn } from 'date-fns'
 import { pl } from 'date-fns/locale'
 import { eventsApi } from '../../api/events'
 import { parseTodoItems, setTodoChecked } from '../../lib/htmlUtils'
@@ -57,6 +57,117 @@ function NowLine({ now, hourStart, hourEnd }: { now: Date; hourStart: number; ho
         }} />
       </div>
     </div>
+  )
+}
+
+// ── DatePickerPopover ────────────────────────────────────────────────────────
+const DAYS_SHORT = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd']
+
+function DatePickerPopover({
+  anchorRef,
+  value,
+  onPick,
+  onClose,
+}: {
+  anchorRef: React.RefObject<HTMLButtonElement>
+  value: Date
+  onPick: (d: Date) => void
+  onClose: () => void
+}) {
+  const [viewDate, setViewDate] = useState(startOfMonth(value))
+  const popRef = useRef<HTMLDivElement>(null)
+
+  // Pozycja pod przyciskiem
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+  useEffect(() => {
+    if (anchorRef.current) {
+      const r = anchorRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 6, left: r.left + r.width / 2 })
+    }
+  }, [anchorRef])
+
+  // Zamknij po kliknięciu poza
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (popRef.current && !popRef.current.contains(e.target as Node) &&
+          anchorRef.current && !anchorRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose, anchorRef])
+
+  const gridStart = startOfWeek(viewDate, { weekStartsOn: 1 })
+  const gridEnd = addDays(startOfWeek(addDays(endOfMonth(viewDate), 6), { weekStartsOn: 1 }), 6)
+  const days = eachDayOfInterval({ start: gridStart, end: gridEnd })
+
+  return createPortal(
+    <div
+      ref={popRef}
+      className="fixed z-[300] w-64 rounded-2xl shadow-2xl border border-gray-100 bg-white p-3 select-none"
+      style={{ top: pos.top, left: pos.left, transform: 'translateX(-50%)' }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {/* Nawigacja miesiąc */}
+      <div className="flex items-center justify-between mb-2">
+        <button
+          onClick={() => setViewDate(subMonths(viewDate, 1))}
+          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 text-base"
+        >‹</button>
+        <span className="text-sm font-semibold text-gray-800 capitalize">
+          {format(viewDate, 'LLLL yyyy', { locale: pl })}
+        </span>
+        <button
+          onClick={() => setViewDate(addMonths(viewDate, 1))}
+          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 text-base"
+        >›</button>
+      </div>
+
+      {/* Nagłówki dni */}
+      <div className="grid grid-cols-7 mb-1">
+        {DAYS_SHORT.map((d) => (
+          <div key={d} className="text-center text-[10px] font-medium text-gray-400">{d}</div>
+        ))}
+      </div>
+
+      {/* Siatka dni */}
+      <div className="grid grid-cols-7 gap-y-0.5">
+        {days.map((day) => {
+          const inMonth = isSameMonth(day, viewDate)
+          const isSelected = isSameDay(day, value)
+          const isNow = isTodayFn(day)
+          return (
+            <button
+              key={day.toISOString()}
+              onClick={() => { onPick(day); onClose() }}
+              className={`h-8 w-full flex items-center justify-center rounded-lg text-xs font-medium transition-colors ${
+                isSelected
+                  ? 'bg-indigo-600 text-white'
+                  : isNow
+                  ? 'bg-indigo-50 text-indigo-600 font-bold'
+                  : inMonth
+                  ? 'text-gray-700 hover:bg-gray-100'
+                  : 'text-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {format(day, 'd')}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Skrót: Dziś */}
+      <div className="mt-2 pt-2 border-t border-gray-100">
+        <button
+          onClick={() => { onPick(new Date()); onClose() }}
+          className="w-full text-xs text-indigo-600 font-medium py-1 rounded-lg hover:bg-indigo-50 transition-colors"
+        >
+          Dziś
+        </button>
+      </div>
+    </div>,
+    document.body
   )
 }
 
@@ -952,7 +1063,8 @@ export function WeeklyCalendar() {
   const [adminOpen, setAdminOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 })
-  const dateInputRef = useRef<HTMLInputElement>(null)
+  const [datePickerOpen, setDatePickerOpen] = useState(false)
+  const datePickerBtnRef = useRef<HTMLButtonElement>(null)
 
   // Śledź pozycję kursora podczas dragu (do pływającego tooltipa)
   useEffect(() => {
@@ -1257,8 +1369,9 @@ export function WeeklyCalendar() {
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 text-lg font-light shrink-0"
           >‹</button>
           <button
-            onClick={() => dateInputRef.current?.showPicker?.() ?? dateInputRef.current?.click()}
-            className="relative font-semibold text-gray-800 text-sm w-[210px] text-center shrink-0 hover:text-indigo-600 transition-colors cursor-pointer rounded-lg px-2 py-1 hover:bg-gray-50"
+            ref={datePickerBtnRef}
+            onClick={() => setDatePickerOpen((o) => !o)}
+            className={`font-semibold text-gray-800 text-sm w-[210px] text-center shrink-0 transition-colors cursor-pointer rounded-lg px-2 py-1 ${datePickerOpen ? 'bg-gray-100 text-indigo-600' : 'hover:bg-gray-50 hover:text-indigo-600'}`}
             title="Kliknij aby przejść do daty"
           >
             {calendarView === 'week' && (
@@ -1271,20 +1384,15 @@ export function WeeklyCalendar() {
               <span className="capitalize">{format(weekStart, 'LLLL yyyy', { locale: pl })}</span>
             )}
             {calendarView === 'year' && format(weekStart, 'yyyy')}
-            {/* Ukryty natywny date picker */}
-            <input
-              ref={dateInputRef}
-              type="date"
-              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-              value={format(weekStart, 'yyyy-MM-dd')}
-              onChange={(e) => {
-                if (!e.target.value) return
-                const picked = new Date(e.target.value + 'T00:00:00')
-                setWeekStart(picked)
-                setCalendarView('week')
-              }}
-            />
           </button>
+          {datePickerOpen && (
+            <DatePickerPopover
+              anchorRef={datePickerBtnRef}
+              value={weekStart}
+              onPick={(d) => { setWeekStart(d); setCalendarView('week') }}
+              onClose={() => setDatePickerOpen(false)}
+            />
+          )}
           <button
             onClick={() => {
               if (calendarView === 'month') setWeekStart(addMonths(weekStart, 1))
