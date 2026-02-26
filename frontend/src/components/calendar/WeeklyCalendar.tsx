@@ -157,15 +157,7 @@ function DatePickerPopover({
         })}
       </div>
 
-      {/* Skrót: Dziś */}
-      <div className="mt-2 pt-2 border-t border-gray-100">
-        <button
-          onClick={() => { onPick(new Date()); onClose() }}
-          className="w-full text-xs text-indigo-600 font-medium py-1 rounded-lg hover:bg-indigo-50 transition-colors"
-        >
-          Dziś
-        </button>
-      </div>
+
     </div>,
     document.body
   )
