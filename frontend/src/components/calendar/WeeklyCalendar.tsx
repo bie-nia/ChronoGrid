@@ -996,6 +996,22 @@ export function WeeklyCalendar() {
     ? today
     : weekStart
 
+  // Czy dzisiejszy dzień jest widoczny w aktualnym oknie kalendarza?
+  const todayVisible = !isTodayFn(daysStart)
+    ? today >= daysStart && today <= addDays(daysStart, visibleDaysCount - 1)
+    : true
+
+  // Nawigacja do przodu: jeśli w trybie dynamic i dziś jest widoczny → reset do układu domyślnego
+  const navigateForward = useCallback(() => {
+    if (viewMode === 'dynamic' && todayVisible) {
+      goToToday()
+    } else if (visibleDaysCount < 7) {
+      setWeekStart(addDays(daysStart, visibleDaysCount))
+    } else {
+      nextWeek()
+    }
+  }, [viewMode, todayVisible, visibleDaysCount, daysStart, goToToday, setWeekStart, nextWeek])
+
   // Scroll poziomy kółkiem (tilt lewo/prawo) → zmiana tygodnia
   // Scroll pionowy → normalne przewijanie godzin
   useEffect(() => {
@@ -1009,13 +1025,13 @@ export function WeeklyCalendar() {
         const now = Date.now()
         if (now - lastTime < 400) return
         lastTime = now
-        if (e.deltaX > 0) visibleDaysCount < 7 ? setWeekStart(addDays(daysStart, visibleDaysCount)) : nextWeek()
+        if (e.deltaX > 0) navigateForward()
         else visibleDaysCount < 7 ? setWeekStart(subDays(daysStart, visibleDaysCount)) : prevWeek()
       }
     }
     el.addEventListener('wheel', handler, { passive: false })
     return () => el.removeEventListener('wheel', handler)
-  }, [nextWeek, prevWeek, visibleDaysCount, daysStart, setWeekStart])
+  }, [navigateForward, prevWeek, visibleDaysCount, daysStart, setWeekStart])
 
   // Klawisze strzałek: ←/→ → tydzień, ↑/↓ → scroll godzin
   useEffect(() => {
@@ -1032,7 +1048,7 @@ export function WeeklyCalendar() {
         visibleDaysCount < 7 ? setWeekStart(subDays(daysStart, visibleDaysCount)) : prevWeek()
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
-        visibleDaysCount < 7 ? setWeekStart(addDays(daysStart, visibleDaysCount)) : nextWeek()
+        navigateForward()
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
         el.scrollBy({ top: -80, behavior: 'smooth' })
@@ -1043,7 +1059,7 @@ export function WeeklyCalendar() {
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [nextWeek, prevWeek, visibleDaysCount, daysStart, setWeekStart])
+  }, [navigateForward, prevWeek, visibleDaysCount, daysStart, setWeekStart])
   const weekStartStr = format(daysStart, 'yyyy-MM-dd')
   const days = Array.from({ length: visibleDaysCount }, (_, i) => addDays(daysStart, i))
 
@@ -1244,8 +1260,7 @@ export function WeeklyCalendar() {
             onClick={() => {
               if (calendarView === 'month') setWeekStart(addMonths(weekStart, 1))
               else if (calendarView === 'year') setWeekStart(addYears(weekStart, 1))
-              else if (visibleDaysCount < 7) setWeekStart(addDays(daysStart, visibleDaysCount))
-              else nextWeek()
+              else navigateForward()
             }}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 text-lg font-light shrink-0"
           >›</button>
