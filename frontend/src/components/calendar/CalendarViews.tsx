@@ -48,7 +48,12 @@ export function MonthView({
   const monthEnd = endOfMonth(anchorDate)
   // Ostatni dzien siatki — niedziela tygodnia zawierajacego ostatni dzien miesiaca
   const gridEnd = startOfWeek(addDays(monthEnd, 7 - 1), { weekStartsOn: 1 })
-  const gridDays = eachDayOfInterval({ start: gridStart, end: addDays(gridEnd, 6) }).slice(0, 42)
+  const allDays = eachDayOfInterval({ start: gridStart, end: addDays(gridEnd, 6) }).slice(0, 42)
+  // Utnij ostatni tydzien jesli caly nalezy do innego miesiaca
+  const weeks = Array.from({ length: allDays.length / 7 }, (_, i) => allDays.slice(i * 7, i * 7 + 7))
+  const gridDays = weeks
+    .filter((week) => week.some((d) => isSameMonth(d, anchorDate)))
+    .flat()
 
   const monthStartStr = format(gridStart, 'yyyy-MM-dd')
 
