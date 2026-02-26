@@ -1147,7 +1147,7 @@ export function WeeklyCalendar() {
     }
     el.addEventListener('wheel', handler, { passive: false })
     return () => el.removeEventListener('wheel', handler)
-  }, [navigateForward, prevWeek, visibleDaysCount, daysStart, setWeekStart])
+  }, [navigateForward, prevWeek, visibleDaysCount, daysStart, setWeekStart, calendarView])
 
   // Klawisze strzałek: ←/→ → tydzień, ↑/↓ → scroll godzin
   useEffect(() => {
@@ -1175,7 +1175,7 @@ export function WeeklyCalendar() {
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [navigateForward, prevWeek, visibleDaysCount, daysStart, setWeekStart])
+  }, [navigateForward, prevWeek, visibleDaysCount, daysStart, setWeekStart, calendarView])
   const weekStartStr = format(daysStart, 'yyyy-MM-dd')
   const days = Array.from({ length: visibleDaysCount }, (_, i) => addDays(daysStart, i))
 
