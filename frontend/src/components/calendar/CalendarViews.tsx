@@ -89,10 +89,14 @@ export function MonthView({
             <div
               key={day.toISOString()}
               onClick={() => onDayClick(day)}
-              className={`bg-white flex flex-col p-1.5 cursor-pointer hover:bg-indigo-50 transition-colors min-h-[80px] ${!inMonth ? 'opacity-40' : ''}`}
+              className={`flex flex-col p-1.5 cursor-pointer transition-colors min-h-[80px] ${
+                today
+                  ? 'bg-indigo-50 hover:bg-indigo-100'
+                  : 'bg-white hover:bg-indigo-50'
+              } ${!inMonth ? 'opacity-40' : ''}`}
             >
               {/* Numer dnia */}
-              <div className={`text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
+              <div className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
                 today ? 'bg-indigo-600 text-white' : 'text-gray-700'
               }`}>
                 {format(day, 'd')}
