@@ -6,6 +6,7 @@ WORKDIR /app
 
 COPY package*.json ./
 RUN npm install --ignore-scripts && \
+    chmod +x node_modules/esbuild/bin/esbuild && \
     node node_modules/esbuild/install.js
 
 COPY . .
