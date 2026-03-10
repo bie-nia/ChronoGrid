@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.security import get_password_hash
 from app.models.activity_template import ActivityTemplate
+from app.models.contact import Contact
 from app.models.eisenhower_task import EisenhowerTask
 from app.models.event import Event
 from app.models.refresh_token import RefreshToken
@@ -103,6 +104,7 @@ def _do_reset(db: Session) -> None:
     db.query(Event).filter(Event.user_id == uid).delete()
     db.query(ActivityTemplate).filter(ActivityTemplate.user_id == uid).delete()
     db.query(EisenhowerTask).filter(EisenhowerTask.user_id == uid).delete()
+    db.query(Contact).filter(Contact.user_id == uid).delete()
 
     # 3. Szablony aktywności
     templates = [
