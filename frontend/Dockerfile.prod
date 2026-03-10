@@ -1,13 +1,11 @@
 # Multi-stage build dla produkcji
 # Stage 1: budowanie statycznych plików
-FROM node:20-alpine AS builder
+FROM node:20 AS builder
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --ignore-scripts && \
-    chmod +x node_modules/esbuild/bin/esbuild && \
-    node node_modules/esbuild/install.js
+RUN npm install
 
 COPY . .
 
