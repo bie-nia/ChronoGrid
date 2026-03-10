@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
   DragEndEvent,
@@ -18,6 +19,7 @@ import { eventsApi } from '../../api/events'
 import { useQuery } from '@tanstack/react-query'
 import { templatesApi } from '../../api/templates'
 import { useCalendarStore, useUndoStore } from '../../store/calendarStore'
+import { useAuthStore } from '../../store/authStore'
 import { useSettingsSync } from '../../hooks/useSettingsSync'
 import { IconRenderer } from './IconRenderer'
 import { arrayMove } from '@dnd-kit/sortable'
@@ -27,78 +29,10 @@ const HOUR_HEIGHT = 60
 type ActiveDrag =
   | { type: 'template'; template: ActivityTemplate }
   | { type: 'calendar_event'; event: Event; durationMin: number; grabOffsetMin: number }
-  | { type: 'eisenhower_widget' }
+  | { type: 'eisenhower_quadrant'; quadrant: Quadrant; color: string; label: string }
   | null
 
-// ── Konfiguracja kwadrantów dla pickera ──────────────────────────────────────
-const QUADRANT_OPTIONS: { id: Quadrant; label: string; color: string; icon: string }[] = [
-  { id: 'do_first', label: 'Pilne · Ważne', color: '#ef4444', icon: '⚡' },
-  { id: 'schedule', label: 'Niepilne · Ważne', color: '#3b82f6', icon: '📅' },
-  { id: 'delegate', label: 'Pilne · Nieważne', color: '#eab308', icon: '🤝' },
-  { id: 'eliminate', label: 'Niepilne · Nieważne', color: '#6b7280', icon: '🗑️' },
-]
 
-// ── QuadrantPicker — modal wyboru kwadrantu po dropie ────────────────────────
-function QuadrantPicker({
-  targetDate,
-  targetHour,
-  onSelect,
-  onClose,
-}: {
-  targetDate: Date
-  targetHour: number
-  onSelect: (quadrant: Quadrant) => void
-  onClose: () => void
-}) {
-  const iconSet = useCalendarStore((s) => s.iconSet)
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
-      onClick={onClose}
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} />
-      {/* Modal */}
-      <div
-        className="relative rounded-xl shadow-2xl p-4 max-w-xs w-full border"
-        style={{ backgroundColor: '#1a1a2e', borderColor: '#333' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-sm font-semibold text-white mb-3 text-center">
-          Wybierz kwadrant matrycy
-        </h3>
-        <div className="grid grid-cols-2 gap-2">
-          {QUADRANT_OPTIONS.map((q) => (
-            <button
-              key={q.id}
-              className="rounded-lg px-3 py-3 text-left transition-all hover:brightness-125 border cursor-pointer"
-              style={{
-                backgroundColor: q.color + '18',
-                borderColor: q.color + '55',
-              }}
-              onClick={() => onSelect(q.id)}
-            >
-              <div className="text-lg mb-0.5" style={{ color: q.color }}>
-                <IconRenderer icon={q.icon} size={20} iconSet={iconSet} />
-              </div>
-              <div className="text-xs font-semibold" style={{ color: q.color }}>
-                {q.label}
-              </div>
-            </button>
-          ))}
-        </div>
-        <button
-          className="mt-3 w-full text-xs py-1.5 rounded-md text-gray-400 hover:text-white transition-colors"
-          style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
-          onClick={onClose}
-        >
-          Anuluj
-        </button>
-      </div>
-    </div>,
-    document.body,
-  )
-}
 
 function yToHour(clientY: number, columnRect: DOMRect, hourStart: number, hourEnd: number): number {
   const relY = clientY - columnRect.top
@@ -127,6 +61,9 @@ export function AppLayout() {
   const hourStart = useCalendarStore((s) => s.hourStart)
   const hourEnd = useCalendarStore((s) => s.hourEnd)
   const { push: undoPush } = useUndoStore()
+  const isDemo = useAuthStore((s) => s.isDemo)
+  const logout = useAuthStore((s) => s.logout)
+  const navigate = useNavigate()
 
   // Sync ustawień z backendem (pobierz przy logowaniu, zapisz przy zmianach)
   useSettingsSync()
@@ -135,11 +72,6 @@ export function AppLayout() {
   // Aktualny over — potrzebny do ghost preview
   const [currentOver, setCurrentOver] = useState<DragEndEvent['over'] | null>(null)
 
-  // ── QuadrantPicker state — po dropie widgetu Eisenhowera na kalendarz ──────
-  const [quadrantPicker, setQuadrantPicker] = useState<{
-    targetDate: Date
-    targetHour: number
-  } | null>(null)
 
   // Śledzimy clientY kursora przez natywny pointermove — dokładne, niezależne od scroll
   const cursorYRef = useRef(0)
@@ -223,14 +155,14 @@ export function AppLayout() {
         icon: ev.activity_template?.icon ?? '📅',
         title: ev.title,
       })
-    } else if (drag.type === 'eisenhower_widget') {
+    } else if (drag.type === 'eisenhower_quadrant') {
       setDragGhost({
         dayIndex: col.dayIndex,
         startHour,
         durationMin: 60,
-        color: '#8b5cf6',
+        color: drag.color,
         icon: '📋',
-        title: 'Matryca Eisenhowera',
+        title: drag.label,
       })
     }
   }
@@ -245,8 +177,8 @@ export function AppLayout() {
       drag = { type: 'template', template: data.template as ActivityTemplate }
     } else if (data?.type === 'calendar_event') {
       drag = { type: 'calendar_event', event: data.event as Event, durationMin: data.durationMin as number, grabOffsetMin: data.grabOffsetMin as number ?? 0 }
-    } else if (data?.type === 'eisenhower_widget') {
-      drag = { type: 'eisenhower_widget' }
+    } else if (data?.type === 'eisenhower_quadrant') {
+      drag = { type: 'eisenhower_quadrant', quadrant: data.quadrant as Quadrant, color: data.color as string, label: data.label as string }
     }
     activeDragRef.current = drag
     setActiveDrag(drag)
@@ -279,12 +211,11 @@ export function AppLayout() {
     const activeData = active.data.current as { type: string; [key: string]: unknown } | undefined
 
     // Sortowanie szablonów — dropped na inny szablon (nie na kalendarz)
-    if (activeData?.type === 'template' && overData?.type !== 'calendar_day') {
+    if (activeData?.type === 'template' && overData?.type !== 'calendar_day' && !over?.id?.toString().includes('calendar')) {
       const activeId = e.active.id as number
       const overId = e.over?.id as number
       if (activeId !== overId && typeof activeId === 'number' && typeof overId === 'number') {
         const ids = templates.map((t) => t.id)
-        // Zastosuj zapisaną kolejność jeśli istnieje
         const orderedIds = templateOrder.length > 0
           ? [...templateOrder, ...ids.filter(id => !templateOrder.includes(id))]
           : ids
@@ -346,9 +277,22 @@ export function AppLayout() {
           end_datetime: event.end_datetime,
         },
       })
-    } else if (activeData?.type === 'eisenhower_widget') {
-      // Otwórz picker kwadrantu — event zostanie stworzony po wyborze
-      setQuadrantPicker({ targetDate, targetHour })
+    } else if (activeData?.type === 'eisenhower_quadrant') {
+      // Od razu twórz event w odpowiednim kwadrancie — bez pickera
+      const quadrant = activeData.quadrant as Quadrant
+      const color = activeData.color as string
+      const label = activeData.label as string
+      const end = new Date(targetDate)
+      end.setMinutes(end.getMinutes() + 60)
+      createMut.mutate({
+        title: label,
+        start_datetime: targetDate.toISOString(),
+        end_datetime: end.toISOString(),
+        is_background: false,
+        eisenhower_quadrant: quadrant,
+        color,
+        icon: '📋',
+      } as Parameters<typeof eventsApi.create>[0])
     }
   }
 
@@ -378,11 +322,11 @@ export function AppLayout() {
       // podgląd jest renderowany jako GhostBlock bezpośrednio w kolumnie docelowej.
       return null
     }
-    if (activeDrag.type === 'eisenhower_widget') {
+    if (activeDrag.type === 'eisenhower_quadrant') {
       return (
         <div className="px-3 py-2 rounded-lg text-sm font-semibold shadow-2xl pointer-events-none flex items-center gap-2"
-          style={{ backgroundColor: 'rgba(139,92,246,0.25)', color: '#8b5cf6', borderLeft: '3px solid #8b5cf6' }}>
-          📋 Matryca Eisenhowera
+          style={{ backgroundColor: activeDrag.color + '33', color: activeDrag.color, borderLeft: `3px solid ${activeDrag.color}` }}>
+          📋 {activeDrag.label}
         </div>
       )
     }
@@ -398,7 +342,32 @@ export function AppLayout() {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="flex h-screen overflow-hidden bg-gray-50">
+      {/* Baner trybu demo */}
+      {isDemo && (
+        <div
+          className="fixed top-0 left-0 right-0 z-[999] flex items-center justify-between px-4 py-1.5 text-xs font-semibold text-white"
+          style={{ backgroundColor: '#4f46e5' }}
+        >
+          <span>Tryb demo — dane resetują się co godzinę i nie są zapisywane na stałe</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { logout(); navigate('/login') }}
+              className="bg-white text-indigo-700 px-3 py-1 rounded-md font-semibold hover:bg-indigo-50 transition-colors"
+            >
+              Zaloguj się
+            </button>
+            <button
+              onClick={() => { logout(); navigate('/') }}
+              className="text-indigo-200 hover:text-white transition-colors"
+              title="Wyjdź z demo"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className={`flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 ${isDemo ? 'pt-8' : ''}`}>
         <Sidebar />
         <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
           <WeeklyCalendar />
@@ -409,32 +378,7 @@ export function AppLayout() {
         {overlayContent}
       </DragOverlay>
 
-      {/* QuadrantPicker — po dropie widgetu Eisenhowera na kalendarz */}
-      {quadrantPicker && (
-        <QuadrantPicker
-          targetDate={quadrantPicker.targetDate}
-          targetHour={quadrantPicker.targetHour}
-          onClose={() => setQuadrantPicker(null)}
-          onSelect={(quadrant) => {
-            const { targetDate, targetHour } = quadrantPicker
-            const start = new Date(targetDate)
-            start.setHours(Math.floor(targetHour), Math.round((targetHour % 1) * 60), 0, 0)
-            const end = new Date(start)
-            end.setMinutes(end.getMinutes() + 60) // 1h domyślnie
-            const qCfg = QUADRANT_OPTIONS.find((q) => q.id === quadrant)!
-            createMut.mutate({
-              title: qCfg.label,
-              start_datetime: start.toISOString(),
-              end_datetime: end.toISOString(),
-              is_background: false,
-              eisenhower_quadrant: quadrant,
-              color: qCfg.color,
-              icon: qCfg.icon,
-            } as Parameters<typeof eventsApi.create>[0])
-            setQuadrantPicker(null)
-          }}
-        />
-      )}
+
     </DndContext>
   )
 }

@@ -1,28 +1,29 @@
 from datetime import datetime
-from typing import List, Optional
-from pydantic import BaseModel, EmailStr
+from typing import Optional
+from pydantic import BaseModel, EmailStr, Field
 
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=8, max_length=128)
 
 
 class UserRegister(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=8, max_length=128)
     invite_token: str
 
 
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., max_length=128)
 
 
 class UserOut(BaseModel):
     id: int
     email: str
     is_admin: bool = False
+    is_demo: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -58,14 +59,14 @@ class InviteTokenBatchCreate(BaseModel):
 
 
 class ChangePassword(BaseModel):
-    current_password: str
-    new_password: str
+    current_password: str = Field(..., max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
 
 
 class AdminUpdateUser(BaseModel):
     email: Optional[str] = None
     is_admin: Optional[bool] = None
-    new_password: Optional[str] = None
+    new_password: Optional[str] = Field(None, min_length=8, max_length=128)
 
 
 class AuditLogOut(BaseModel):

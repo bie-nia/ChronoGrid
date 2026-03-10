@@ -1,11 +1,14 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { login, register } from '../../api/auth'
+import { ChronoGridLogo } from './ChronoGridLogo'
 
 type Mode = 'login' | 'register'
 
 export function LoginPage() {
   const setTokens = useAuthStore((s) => s.setTokens)
+  const navigate = useNavigate()
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -23,6 +26,7 @@ export function LoginPage() {
       if (mode === 'login') {
         const token = await login(email, password)
         setTokens(token.access_token, token.refresh_token)
+        navigate('/app', { replace: true })
       } else {
         await register(email, password, inviteToken)
         setSuccess('Konto utworzone! Możesz się teraz zalogować.')
@@ -42,45 +46,51 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">ADHD Calendar</h1>
-        <p className="text-sm text-gray-500 mb-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-8 w-full max-w-sm">
+        <button
+          onClick={() => navigate('/')}
+          className="text-xs text-gray-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors mb-4 block"
+        >
+          ← Wróć do strony głównej
+        </button>
+        <ChronoGridLogo size={36} className="mb-1" />
+        <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">
           {mode === 'login' ? 'Zaloguj się, aby kontynuować' : 'Utwórz nowe konto'}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="w-full border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
               required
               autoComplete="email"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Hasło</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Hasło</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="w-full border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
               required
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             />
           </div>
           {mode === 'register' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Kod zaproszenia</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Kod zaproszenia</label>
               <input
                 type="text"
                 value={inviteToken}
                 onChange={(e) => setInviteToken(e.target.value.trim())}
                 placeholder="Wklej kod otrzymany od administratora"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 font-mono"
+                className="w-full border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 font-mono"
                 required
               />
             </div>

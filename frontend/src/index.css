@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── CSS Variables — light / dark ── */
+:root {
+  --bg-app: #f9fafb;
+  --bg-surface: #ffffff;
+  --bg-surface-2: #f3f4f6;
+  --bg-surface-3: #e5e7eb;
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+  --text-subtle: #9ca3af;
+  --border-color: #e5e7eb;
+  --border-muted: #d1d5db;
+  --scrollbar-thumb: #d1d5db;
+  --scrollbar-thumb-hover: #9ca3af;
+}
+
+.dark {
+  --bg-app: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-surface-2: #273344;
+  --bg-surface-3: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --border-color: #334155;
+  --border-muted: #475569;
+  --scrollbar-thumb: #475569;
+  --scrollbar-thumb-hover: #64748b;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -19,8 +50,8 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-color: #f9fafb;
-    color: #111827;
+    background-color: var(--bg-app);
+    color: var(--text-primary);
   }
 
   /* Custom scrollbar */
@@ -31,11 +62,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #d1d5db;
+    background: var(--scrollbar-thumb);
     border-radius: 2px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #9ca3af;
+    background: var(--scrollbar-thumb-hover);
   }
 }
 
@@ -46,12 +77,12 @@
   outline: none;
   font-size: 0.875rem;
   line-height: 1.6;
-  color: #111827;
+  color: var(--text-primary);
 }
 .tiptap-editor .ProseMirror p { margin: 0 0 0.25em; }
 .tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: #d1d5db;
+  color: var(--text-subtle);
   pointer-events: none;
   float: left;
   height: 0;
@@ -62,7 +93,7 @@
 .tiptap-editor .ProseMirror s { text-decoration: line-through; }
 .tiptap-editor .ProseMirror hr {
   border: none;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border-color);
   margin: 8px 0;
 }
 .tiptap-editor .ProseMirror ul {
@@ -89,14 +120,37 @@
   user-select: none;
 }
 .tiptap-editor .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
   width: 15px;
   height: 15px;
+  min-width: 15px;
   cursor: pointer;
   border-radius: 3px;
+  border: 1.5px solid var(--border-muted);
+  background: var(--bg-surface-2);
+  transition: background 0.15s, border-color 0.15s;
+  position: relative;
+}
+.tiptap-editor .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+}
+.tiptap-editor .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0px;
+  width: 5px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
 }
 .tiptap-editor .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
   text-decoration: line-through;
-  color: #9ca3af;
+  color: var(--text-subtle);
 }
 .tiptap-editor .ProseMirror ul[data-type="taskList"] li > div {
   flex: 1;
@@ -117,13 +171,23 @@
 .prose strong { font-weight: 700; }
 .prose em { font-style: italic; }
 .prose u { text-decoration: underline; }
-.prose code { background: #f3f4f6; border-radius: 3px; padding: 0 3px; font-size: 0.85em; font-family: monospace; }
-.prose hr { border: none; border-top: 1px solid #e5e7eb; margin: 0.5em 0; }
+.prose code { background: var(--bg-surface-2); border-radius: 3px; padding: 0 3px; font-size: 0.85em; font-family: monospace; }
+.prose hr { border: none; border-top: 1px solid var(--border-color); margin: 0.5em 0; }
 .prose a { color: #6366f1; text-decoration: underline; }
-.prose blockquote { border-left: 3px solid #e5e7eb; padding-left: 0.75em; color: #6b7280; margin: 0.25em 0; }
+.prose blockquote { border-left: 3px solid var(--border-color); padding-left: 0.75em; color: var(--text-muted); margin: 0.25em 0; }
 
 /* Checkboxy w markdown */
 .prose li.md-task { list-style: none; margin-left: -1em; }
 .prose li.md-task label { display: flex; align-items: center; gap: 0.4em; cursor: default; }
 .prose li.md-task input[type=checkbox] { width: 14px; height: 14px; accent-color: #6366f1; cursor: default; }
-.prose li.md-task.done label { text-decoration: line-through; color: #9ca3af; }
+.prose li.md-task.done label { text-decoration: line-through; color: var(--text-subtle); }
+
+/* ── input[type="number"] — ukryj natywne strzałki spinnera ── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}

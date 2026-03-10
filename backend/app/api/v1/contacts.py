@@ -5,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, check_demo_quota
 from app.db.base import get_db
 from app.models.contact import Contact
 from app.models.user import User
@@ -38,6 +38,7 @@ def create_contact(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    check_demo_quota(current_user, db, "contact")
     contact = Contact(**body.model_dump(), user_id=current_user.id)
     db.add(contact)
     db.commit()
@@ -106,6 +107,11 @@ async def upload_contact_photo(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.is_demo:
+        raise HTTPException(
+            status_code=403,
+            detail="Tryb demo: upload zdjęć jest niedozwolony.",
+        )
     contact = (
         db.query(Contact)
         .filter(Contact.id == contact_id, Contact.user_id == current_user.id)

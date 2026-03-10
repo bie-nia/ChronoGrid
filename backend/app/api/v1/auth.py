@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 limiter = Limiter(key_func=get_remote_address)
 
 from app.core.audit import AuditAction, log_event
+from app.core.config import settings
+from app.core.demo_seed import reset_demo_data
 from app.core.security import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     REFRESH_TOKEN_EXPIRE_DAYS,
@@ -92,6 +94,7 @@ def login(
 
 
 @router.post("/refresh", response_model=TokenPair)
+@limiter.limit("20/minute")
 def refresh_token(
     request: Request,
     payload: RefreshRequest,
@@ -223,6 +226,24 @@ def register(
     return user
 
 
+@router.post("/demo", response_model=TokenPair)
+@limiter.limit("5/minute")
+def demo_login(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Zwraca tokeny dla konta demo — bez hasła. Resetuje dane do stanu początkowego."""
+    # Reset danych przy każdym logowaniu — eventy zawsze na bieżący tydzień
+    reset_demo_data(db)
+    user = db.query(User).filter(User.email == settings.DEMO_EMAIL).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Demo account not initialized",
+        )
+    return _issue_token_pair(user, request, db)
+
+
 @router.get("/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
@@ -235,6 +256,12 @@ def change_password(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # Blokada dla konta demo
+    if current_user.is_demo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tryb demo: zmiana hasła jest niedozwolona.",
+        )
     if not verify_password(payload.current_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

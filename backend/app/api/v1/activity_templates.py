@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, check_demo_quota
 from app.db.base import get_db
 from app.models.activity_template import ActivityTemplate
 from app.models.event import Event
@@ -36,6 +36,7 @@ def create_template(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    check_demo_quota(current_user, db, "template")
     template = ActivityTemplate(**payload.model_dump(), user_id=current_user.id)
     db.add(template)
     db.commit()

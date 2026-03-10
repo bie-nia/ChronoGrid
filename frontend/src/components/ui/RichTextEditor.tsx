@@ -28,7 +28,7 @@ function ToolBtn({
       className="w-8 h-7 flex items-center justify-center rounded text-sm transition-colors"
       style={{
         backgroundColor: active ? accentColor + '22' : 'transparent',
-        color: active ? accentColor : '#6b7280',
+        color: active ? accentColor : 'var(--text-muted)',
         fontWeight: active ? 700 : 400,
       }}
     >
@@ -93,7 +93,7 @@ export function RichTextEditor({ value, onChange, accentColor, onCtrlEnter }: Ri
       initialValue.current = value
       // Ustaw nową treść tylko jeśli edytor ma inną (nie nadpisuj tego co użytkownik pisze)
       if (editor.getHTML() !== value) {
-        editor.commands.setContent(value || '', false)
+        editor.commands.setContent(value || '')
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,10 +102,10 @@ export function RichTextEditor({ value, onChange, accentColor, onCtrlEnter }: Ri
   if (!editor) return null
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="flex flex-col flex-1 min-h-0" style={{ '--accent': accentColor } as React.CSSProperties}>
       {/* Toolbar */}
       <div className="flex items-center gap-0.5 px-2 py-1.5 border-b shrink-0"
-        style={{ borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }}
+        style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-surface-2)' }}
       >
         {/* Checkbox / lista zadań */}
         <ToolBtn
@@ -120,7 +120,7 @@ export function RichTextEditor({ value, onChange, accentColor, onCtrlEnter }: Ri
           </svg>
         </ToolBtn>
 
-        <div className="w-px h-4 bg-gray-200 mx-1" />
+        <div className="w-px h-4 bg-gray-200 dark:bg-slate-600 mx-1" />
 
         {/* Bold */}
         <ToolBtn
@@ -162,7 +162,7 @@ export function RichTextEditor({ value, onChange, accentColor, onCtrlEnter }: Ri
           <span style={{ textDecoration: 'line-through', fontWeight: 600 }}>S</span>
         </ToolBtn>
 
-        <div className="w-px h-4 bg-gray-200 mx-1" />
+        <div className="w-px h-4 bg-gray-200 dark:bg-slate-600 mx-1" />
 
         {/* Lista punktowana */}
         <ToolBtn

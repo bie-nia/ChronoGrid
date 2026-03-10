@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = "admin@adhd.local"
     ADMIN_PASSWORD: str = "changeme_admin"
 
+    DEMO_EMAIL: str = "demo@chronogrid.app"
+    DEMO_PASSWORD: str = "demo-only-no-real-data"
+
     # CORS — lista originów oddzielona przecinkami
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 

@@ -74,18 +74,18 @@ export function ActivityTemplateOverlay({ template, onSave, onDelete, onClose }:
       style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div ref={modalRef} className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+      <div ref={modalRef} className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700">
           <div className="flex items-center gap-3">
             <div className="w-1 h-6 rounded-full" style={{ backgroundColor: form.color }} />
-            <h2 className="text-base font-bold text-gray-900">
+            <h2 className="text-base font-bold text-gray-900 dark:text-slate-100">
               {isEdit ? 'Edytuj aktywność' : 'Nowa aktywność'}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-lg leading-none"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-lg leading-none"
             title="Zamknij"
           >✕</button>
         </div>
@@ -99,47 +99,55 @@ export function ActivityTemplateOverlay({ template, onSave, onDelete, onClose }:
             </span>
             <div>
               <p className="font-semibold text-sm" style={{ color: form.color }}>{form.name || 'Podgląd...'}</p>
-              <p className="text-xs text-gray-400">{form.default_duration} min</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500">{form.default_duration} min</p>
             </div>
           </div>
 
           {/* Nazwa */}
           <div className="relative">
-            <label className="absolute top-2 left-3 text-xs font-medium text-gray-400 pointer-events-none z-10">Nazwa</label>
+            <label className="absolute top-2 left-3 text-xs font-medium text-gray-400 dark:text-slate-500 pointer-events-none z-10">Nazwa</label>
             <input
               placeholder="Np. Nauka, Trening, Spotkanie..."
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               autoFocus
               onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
-              className="w-full border border-gray-200 rounded-xl px-3 pt-6 pb-2 text-sm text-gray-900 placeholder:text-gray-300 focus:outline-none transition-all"
+              className="w-full border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-xl px-3 pt-6 pb-2 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-300 dark:placeholder:text-slate-600 focus:outline-none transition-all"
               onFocus={e => e.currentTarget.style.borderColor = form.color}
               onBlur={e => e.currentTarget.style.borderColor = ''}
             />
           </div>
 
+          {/* Opis */}
+          <DescriptionField
+            value={form.description}
+            onChange={(html) => setForm({ ...form, description: html })}
+            accentColor={form.color}
+            modalRef={modalRef}
+          />
+
           {/* Ikona */}
           <div>
-            <p className="text-xs font-medium text-gray-400 mb-2">
-              Ikona <span className="text-gray-300">— {iconSetConfig.name}</span>
+            <p className="text-xs font-medium text-gray-400 dark:text-slate-500 mb-2">
+              Ikona <span className="text-gray-300 dark:text-slate-600">— {iconSetConfig.name}</span>
             </p>
 
             {/* Wyszukiwarka ikon */}
             <div className="relative mb-2">
-              <label className="absolute top-2 left-3 text-xs font-medium text-gray-400 pointer-events-none z-10">Szukaj</label>
+              <label className="absolute top-2 left-3 text-xs font-medium text-gray-400 dark:text-slate-500 pointer-events-none z-10">Szukaj</label>
               <input
                 type="text"
                 placeholder={`Szukaj w ${iconSetConfig.name}...`}
                 value={iconSearch}
                 onChange={(e) => setIconSearch(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 pt-6 pb-2 text-sm text-gray-900 placeholder:text-gray-300 focus:outline-none transition-all"
+                className="w-full border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-xl px-3 pt-6 pb-2 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-300 dark:placeholder:text-slate-600 focus:outline-none transition-all"
                 onFocus={e => e.currentTarget.style.borderColor = form.color}
                 onBlur={e => e.currentTarget.style.borderColor = ''}
               />
             </div>
 
             {/* Siatka ikon */}
-            <div className="grid grid-cols-8 gap-1 max-h-40 overflow-y-auto p-1 border border-gray-100 rounded-xl bg-gray-50/50">
+            <div className="grid grid-cols-8 gap-1 max-h-40 overflow-y-auto p-1 border border-gray-100 dark:border-slate-700 rounded-xl bg-gray-50/50 dark:bg-slate-700/50">
               {filteredIcons.map((iconName) => {
                 const iconId = formatIconId(iconSet, iconName)
                 const isSelected = form.icon === iconId
@@ -149,8 +157,8 @@ export function ActivityTemplateOverlay({ template, onSave, onDelete, onClose }:
                     type="button"
                     title={iconName}
                     onClick={() => setForm({ ...form, icon: iconId })}
-                    className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
-                      isSelected ? 'scale-110 shadow-sm' : 'hover:bg-white hover:shadow-sm'
+                    className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all text-slate-700 dark:text-slate-200 ${
+                      isSelected ? 'scale-110 shadow-sm' : 'hover:bg-white dark:hover:bg-slate-600 hover:shadow-sm'
                     }`}
                     style={isSelected ? { backgroundColor: form.color + '22', color: form.color, outline: `2px solid ${form.color}`, outlineOffset: '1px' } : {}}
                   >
@@ -159,14 +167,14 @@ export function ActivityTemplateOverlay({ template, onSave, onDelete, onClose }:
                 )
               })}
               {filteredIcons.length === 0 && (
-                <div className="col-span-8 text-xs text-gray-400 text-center py-4">Brak wyników</div>
+                <div className="col-span-8 text-xs text-gray-400 dark:text-slate-500 text-center py-4">Brak wyników</div>
               )}
             </div>
           </div>
 
           {/* Kolor */}
           <div>
-            <p className="text-xs font-medium text-gray-400 mb-2">Kolor</p>
+            <p className="text-xs font-medium text-gray-400 dark:text-slate-500 mb-2">Kolor</p>
             <div className="flex gap-2 flex-wrap">
               {COLOR_OPTIONS.map((c) => (
                 <button
@@ -205,7 +213,7 @@ export function ActivityTemplateOverlay({ template, onSave, onDelete, onClose }:
 
           {/* Czas trwania */}
           <div>
-            <p className="text-xs font-medium text-gray-400 mb-2">Domyślny czas trwania</p>
+            <p className="text-xs font-medium text-gray-400 dark:text-slate-500 mb-2">Domyślny czas trwania</p>
             <div className="flex gap-1.5 flex-wrap items-center">
               {QUICK_DURATIONS.map((m) => (
                 <button
@@ -244,7 +252,7 @@ export function ActivityTemplateOverlay({ template, onSave, onDelete, onClose }:
                   className="w-20 border rounded-lg px-2 py-1 text-sm font-semibold text-center focus:outline-none transition-all"
                   style={{ borderColor: form.color }}
                 />
-                <span className="text-sm text-gray-400">minut</span>
+                <span className="text-sm text-gray-400 dark:text-slate-500">minut</span>
               </div>
             )}
           </div>
@@ -263,23 +271,16 @@ export function ActivityTemplateOverlay({ template, onSave, onDelete, onClose }:
                 <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.is_background ? 'translate-x-5' : ''}`} />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-700">Proces w tle</p>
-                <p className="text-xs text-gray-400">Event będzie wyświetlany przezroczyście w kalendarzu</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-slate-200">Proces w tle</p>
+                <p className="text-xs text-gray-400 dark:text-slate-500">Event będzie wyświetlany przezroczyście w kalendarzu</p>
               </div>
             </label>
           </div>
 
-          {/* Opis */}
-          <DescriptionField
-            value={form.description}
-            onChange={(html) => setForm({ ...form, description: html })}
-            accentColor={form.color}
-            modalRef={modalRef}
-          />
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-wrap">
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-700 flex gap-3 flex-wrap">
           {onDelete && (
             <button
               type="button"
@@ -292,7 +293,7 @@ export function ActivityTemplateOverlay({ template, onSave, onDelete, onClose }:
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 border border-gray-200 text-gray-600 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
+            className="flex-1 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-400 rounded-xl py-2.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
           >
             Anuluj
           </button>

@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, check_demo_quota
 from app.db.base import get_db
 from app.models.eisenhower_task import EisenhowerTask
 from app.models.user import User
@@ -35,6 +35,7 @@ def create_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    check_demo_quota(current_user, db, "task")
     task = EisenhowerTask(**payload.model_dump(), user_id=current_user.id)
     db.add(task)
     db.commit()

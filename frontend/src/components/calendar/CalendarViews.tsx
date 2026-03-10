@@ -72,7 +72,7 @@ export function MonthView({
       {/* Naglowki dni tygodnia */}
       <div className="grid grid-cols-7 mb-1">
         {WEEKDAYS.map((d) => (
-          <div key={d} className="text-center text-[11px] font-medium text-gray-400 py-1">{d}</div>
+          <div key={d} className="text-center text-[11px] font-medium text-gray-400 dark:text-slate-500 py-1">{d}</div>
         ))}
       </div>
 
@@ -91,13 +91,13 @@ export function MonthView({
               onClick={() => onDayClick(day)}
               className={`flex flex-col p-1.5 cursor-pointer transition-colors min-h-[80px] rounded-xl border ${
                 today
-                  ? 'bg-indigo-50 hover:bg-indigo-100 border-indigo-300'
-                  : 'bg-white hover:bg-indigo-50 border-gray-100'
+                  ? 'bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border-indigo-300 dark:border-indigo-700'
+                  : 'bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 border-gray-100 dark:border-slate-700'
               } ${!inMonth ? 'opacity-40' : ''}`}
             >
               {/* Numer dnia */}
               <div className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
-                today ? 'bg-indigo-600 text-white' : 'text-gray-700'
+                today ? 'bg-indigo-600 text-white' : 'text-gray-700 dark:text-slate-200'
               }`}>
                 {format(day, 'd')}
               </div>
@@ -126,7 +126,7 @@ export function MonthView({
                   </div>
                 ))}
                 {dayEvs.length > 3 && (
-                  <span className="text-[10px] text-gray-400 pl-1">+{dayEvs.length - 3}</span>
+                  <span className="text-[10px] text-gray-400 dark:text-slate-500 pl-1">+{dayEvs.length - 3}</span>
                 )}
               </div>
             </div>
@@ -169,13 +169,13 @@ function MiniMonth({
   const rowCount = days.length / 7  // 5
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="text-xs font-semibold text-gray-600 mb-1 text-center shrink-0">
+      <div className="text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1 text-center shrink-0">
         {MONTH_NAMES_SHORT[monthIndex]}
       </div>
       {/* Nagłówki dni tygodnia */}
       <div className="grid grid-cols-7 shrink-0">
         {['P','W','S','C','Pi','So','N'].map((d) => (
-          <div key={d} className="text-center text-[8px] text-gray-400 pb-0.5">{d}</div>
+          <div key={d} className="text-center text-[8px] text-gray-400 dark:text-slate-600 pb-0.5">{d}</div>
         ))}
       </div>
       {/* Siatka dni — rozciąga się na całą dostępną wysokość */}
@@ -198,7 +198,7 @@ function MiniMonth({
               {/* Numer dnia */}
               <div className={`text-sm w-6 h-6 flex items-center justify-center rounded-full font-medium ${
                 today ? 'bg-indigo-600 text-white font-bold' :
-                inMonth ? 'text-gray-700' : 'text-gray-300'
+                inMonth ? 'text-gray-700 dark:text-slate-300' : 'text-gray-300 dark:text-slate-700'
               }`}>
                 {inMonth ? format(day, 'd') : ''}
               </div>
@@ -240,7 +240,7 @@ export function YearView({
       {/* Siatka 4x3 mini-kalendarzy — wypełnia całą dostępną wysokość */}
       <div className="grid grid-cols-4 grid-rows-3 gap-4 flex-1 min-h-0">
         {Array.from({ length: 12 }, (_, i) => (
-          <div key={i} className="bg-gray-50 rounded-xl p-3 border border-gray-100 flex flex-col min-h-0">
+          <div key={i} className="bg-gray-50 dark:bg-slate-800 rounded-xl p-3 border border-gray-100 dark:border-slate-700 flex flex-col min-h-0">
             <MiniMonth
               year={year}
               monthIndex={i}

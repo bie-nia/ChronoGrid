@@ -1,23 +1,23 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.activity_template import ActivityTemplateOut
 
 
 class EventBase(BaseModel):
-    title: str
+    title: str = Field(..., max_length=200)
     start_datetime: datetime
     end_datetime: datetime
-    description: Optional[str] = None
-    location: Optional[str] = None
-    recurrence_rule: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=10_000)
+    location: Optional[str] = Field(None, max_length=200)
+    recurrence_rule: Optional[str] = Field(None, max_length=100)
     activity_template_id: Optional[int] = None
     is_background: bool = False
-    color: Optional[str] = None
-    icon: Optional[str] = None
-    eisenhower_quadrant: Optional[str] = None
+    color: Optional[str] = Field(None, max_length=20)
+    icon: Optional[str] = Field(None, max_length=100)
+    eisenhower_quadrant: Optional[str] = Field(None, max_length=20)
 
     @field_validator("end_datetime")
     @classmethod
@@ -32,17 +32,17 @@ class EventCreate(EventBase):
 
 
 class EventUpdate(BaseModel):
-    title: Optional[str] = None
+    title: Optional[str] = Field(None, max_length=200)
     start_datetime: Optional[datetime] = None
     end_datetime: Optional[datetime] = None
-    description: Optional[str] = None
-    location: Optional[str] = None
-    recurrence_rule: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=10_000)
+    location: Optional[str] = Field(None, max_length=200)
+    recurrence_rule: Optional[str] = Field(None, max_length=100)
     activity_template_id: Optional[int] = None
     is_background: Optional[bool] = None
-    color: Optional[str] = None
-    icon: Optional[str] = None
-    eisenhower_quadrant: Optional[str] = None
+    color: Optional[str] = Field(None, max_length=20)
+    icon: Optional[str] = Field(None, max_length=100)
+    eisenhower_quadrant: Optional[str] = Field(None, max_length=20)
 
 
 class EventOut(EventBase):

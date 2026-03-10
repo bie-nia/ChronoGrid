@@ -105,7 +105,7 @@ function DatePickerPopover({
   return createPortal(
     <div
       ref={popRef}
-      className="fixed z-[300] w-64 rounded-2xl shadow-2xl border border-gray-100 bg-white p-3 select-none"
+      className="fixed z-[300] w-64 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 select-none"
       style={{ top: pos.top, left: pos.left, transform: 'translateX(-50%)' }}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -113,21 +113,21 @@ function DatePickerPopover({
       <div className="flex items-center justify-between mb-2">
         <button
           onClick={() => setViewDate(subMonths(viewDate, 1))}
-          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 text-base"
+          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 text-base"
         >‹</button>
-        <span className="text-sm font-semibold text-gray-800 capitalize">
+        <span className="text-sm font-semibold text-gray-800 dark:text-slate-100 capitalize">
           {format(viewDate, 'LLLL yyyy', { locale: pl })}
         </span>
         <button
           onClick={() => setViewDate(addMonths(viewDate, 1))}
-          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 text-base"
+          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 text-base"
         >›</button>
       </div>
 
       {/* Nagłówki dni */}
       <div className="grid grid-cols-7 mb-1">
         {DAYS_SHORT.map((d) => (
-          <div key={d} className="text-center text-[10px] font-medium text-gray-400">{d}</div>
+          <div key={d} className="text-center text-[10px] font-medium text-gray-400 dark:text-slate-500">{d}</div>
         ))}
       </div>
 
@@ -145,10 +145,10 @@ function DatePickerPopover({
                 isSelected
                   ? 'bg-indigo-600 text-white'
                   : isNow
-                  ? 'bg-indigo-50 text-indigo-600 font-bold'
+                  ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 font-bold'
                   : inMonth
-                  ? 'text-gray-700 hover:bg-gray-100'
-                  : 'text-gray-300 hover:bg-gray-50'
+                  ? 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
+                  : 'text-gray-300 dark:text-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'
               }`}
             >
               {format(day, 'd')}
@@ -400,6 +400,7 @@ function EventBlock({
   hourStart,
   onRightClick,
   onDelete,
+  onDuplicate,
   onResizeEnd,
   iconSet,
   rightOffset = 4,
@@ -409,6 +410,7 @@ function EventBlock({
   hourStart: number
   onRightClick: (e: Event) => void
   onDelete: (e: Event) => void
+  onDuplicate: (e: Event) => void
   onResizeEnd: (event: Event, newDurationMin: number) => void
   iconSet?: import('../../lib/iconSets').IconSetId
   rightOffset?: number
@@ -531,7 +533,10 @@ function EventBlock({
         {...combinedListeners}
         {...attributes}
         onContextMenu={handleContextMenu}
-        onMouseDown={(e) => { if (e.button === 1) { e.preventDefault(); onDelete(event) } }}
+        onMouseDown={(e) => {
+          if (e.button === 1) { e.preventDefault(); onDelete(event) }
+          if (e.button === 0 && e.altKey) { e.preventDefault(); e.stopPropagation(); onDuplicate(event) }
+        }}
         onMouseEnter={handleMouseEnter}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
@@ -541,23 +546,37 @@ function EventBlock({
           right: `${rightOffset}px`,
           height: `${height}px`,
           opacity: isDragging ? 0.35 : 1,
-          backgroundColor: color + 'dd',
+          // Ręcznie dodane (bez szablonu): białe tło + kolorowa ramka
+          // Z szablonem aktywności: półprzezroczyste (bardziej niż poprzednio)
+          backgroundColor: event.activity_template_id ? color + '88' : color + '30',
+          border: event.activity_template_id
+            ? `1.5px solid ${color}bb`
+            : `2px solid ${color}`,
           borderLeft: `3px solid ${color}`,
           cursor: 'grab',
         }}
       >
         <div className="px-1.5 py-0.5 h-full flex flex-col justify-start pointer-events-none">
-          <div className="text-white text-xs font-semibold leading-snug truncate flex items-center gap-1">
+          <div
+            className="text-xs font-semibold leading-snug truncate flex items-center gap-1"
+            style={{ color: '#ffffff' }}
+          >
             <IconRenderer icon={icon} size={12} className="shrink-0" iconSet={iconSet} />
             {event.title}
           </div>
           {height > 34 && (
-            <div className="text-white/75 text-xs truncate">
+            <div
+              className="text-xs truncate"
+              style={{ color: 'rgba(255,255,255,0.75)' }}
+            >
               {format(startDt, 'HH:mm')}–{format(displayEnd, 'HH:mm')}
             </div>
           )}
           {event.location && height > 52 && (
-            <div className="text-white/60 text-xs truncate flex items-center gap-0.5"><IconRenderer icon="📍" iconSet={iconSet} size={10} className="shrink-0 opacity-75" />{event.location}</div>
+            <div
+              className="text-xs truncate flex items-center gap-0.5"
+              style={{ color: 'rgba(255,255,255,0.6)' }}
+            ><IconRenderer icon="📍" iconSet={iconSet} size={10} className="shrink-0 opacity-75" />{event.location}</div>
           )}
         </div>
         {/* Uchwyt resize */}
@@ -773,9 +792,9 @@ function EisenhowerCalendarBlock({
         right: `${rightOffset}px`,
         height: `${height}px`,
         opacity: isDragging ? 0.35 : 1,
-        backgroundColor: qConfig.color + '40',
+        backgroundColor: qConfig.color + '70',
         borderLeft: `3px solid ${qConfig.color}`,
-        border: `1px solid ${qConfig.color}66`,
+        border: `1px solid ${qConfig.color}99`,
         borderLeftWidth: '3px',
         borderLeftColor: qConfig.color,
         cursor: 'grab',
@@ -792,13 +811,13 @@ function EisenhowerCalendarBlock({
         />
         <span
           className="text-xs font-bold truncate"
-          style={{ color: qConfig.color }}
+          style={{ color: '#ffffff' }}
         >
           {qConfig.label}
         </span>
         <span
           className="text-xs font-medium ml-auto"
-          style={{ color: qConfig.color + '99' }}
+          style={{ color: 'rgba(255,255,255,0.6)' }}
         >
           {quadrantTasks.length}
         </span>
@@ -886,6 +905,7 @@ function DayColumn({
   onSlotClick,
   onEventRightClick,
   onEventDelete,
+  onEventDuplicate,
   onEventResizeEnd,
   iconSet,
   eisenhowerTasks,
@@ -903,6 +923,7 @@ function DayColumn({
   onSlotClick: (date: Date, hour: number) => void
   onEventRightClick: (e: Event) => void
   onEventDelete: (e: Event) => void
+  onEventDuplicate: (e: Event) => void
   onEventResizeEnd: (event: Event, newDurationMin: number) => void
   iconSet?: import('../../lib/iconSets').IconSetId
   eisenhowerTasks: EisenhowerTask[]
@@ -927,14 +948,14 @@ function DayColumn({
   return (
     <div
       ref={setRefs}
-      className={`relative border-l border-gray-100 transition-colors overflow-hidden ${isOver ? 'bg-indigo-50/50' : ''}`}
+      className={`relative border-l border-gray-100 dark:border-slate-700 transition-colors overflow-hidden ${isOver ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}
       style={{ height: `${(hourEnd - hourStart) * HOUR_HEIGHT}px` }}
     >
       {/* Linie godzinowe */}
       {Array.from({ length: hourEnd - hourStart }, (_, i) => (
         <div
           key={i}
-          className="absolute w-full border-t border-gray-100 pointer-events-none"
+          className="absolute w-full border-t border-gray-100 dark:border-slate-700/60 pointer-events-none"
           style={{ top: `${i * HOUR_HEIGHT}px` }}
         />
       ))}
@@ -942,7 +963,7 @@ function DayColumn({
       {Array.from({ length: hourEnd - hourStart }, (_, i) => (
         <div
           key={`h${i}`}
-          className="absolute w-full border-t border-gray-50 pointer-events-none"
+          className="absolute w-full border-t border-gray-50 dark:border-slate-800 pointer-events-none"
           style={{ top: `${i * HOUR_HEIGHT + HOUR_HEIGHT / 2}px` }}
         />
       ))}
@@ -953,7 +974,7 @@ function DayColumn({
         return (
           <div
             key={`slot${i}`}
-            className="absolute w-full hover:bg-indigo-50/40 cursor-pointer transition-colors"
+            className="absolute w-full hover:bg-white/5 cursor-pointer transition-colors"
             style={{ top: `${(i * HOUR_HEIGHT) / 2}px`, height: `${HOUR_HEIGHT / 2}px` }}
             onClick={() => onSlotClick(date, hour)}
           />
@@ -995,6 +1016,7 @@ function DayColumn({
             hourStart={hourStart}
             onRightClick={onEventRightClick}
             onDelete={onEventDelete}
+            onDuplicate={onEventDuplicate}
             onResizeEnd={onEventResizeEnd}
             iconSet={iconSet}
             rightOffset={overlaps ? BG_STRIP_WIDTH + 4 : 4}
@@ -1357,9 +1379,9 @@ export function WeeklyCalendar() {
   }, [undoPop, qc])
 
   return (
-    <div ref={calendarWrapRef} className="flex flex-col h-full min-h-0 bg-white">
+    <div ref={calendarWrapRef} className="flex flex-col h-full min-h-0 bg-white dark:bg-slate-900">
       {/* Nawigacja — wycentrowana */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-3 border-b border-gray-100 shrink-0">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-3 border-b border-gray-100 dark:border-slate-700 shrink-0">
         {/* Lewa strona — pusty spacer */}
         <div />
         {/* Środek — nawigacja (zależna od aktywnego widoku) */}
@@ -1371,12 +1393,12 @@ export function WeeklyCalendar() {
               else if (visibleDaysCount < 7) setWeekStart(subDays(daysStart, visibleDaysCount))
               else prevWeek()
             }}
-            className="w-10 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 text-lg font-light shrink-0"
+            className="w-10 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400 text-lg font-light shrink-0"
           >‹</button>
           <button
             ref={datePickerBtnRef}
             onClick={() => setDatePickerOpen((o) => !o)}
-            className={`font-semibold text-gray-800 text-sm min-w-[220px] text-center shrink-0 transition-colors cursor-pointer rounded-lg px-3 py-1 ${datePickerOpen ? 'bg-gray-100 text-indigo-600' : 'hover:bg-gray-50 hover:text-indigo-600'}`}
+            className={`font-semibold text-gray-800 dark:text-slate-200 text-sm min-w-[220px] text-center shrink-0 transition-colors cursor-pointer rounded-lg px-3 py-1 ${datePickerOpen ? 'bg-gray-100 dark:bg-slate-700 text-indigo-600' : 'hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-indigo-600'}`}
             title="Kliknij aby przejść do daty"
           >
             {calendarView === 'week' && (
@@ -1404,7 +1426,7 @@ export function WeeklyCalendar() {
               else if (calendarView === 'year') setWeekStart(addYears(weekStart, 1))
               else navigateForward()
             }}
-            className="w-10 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 text-lg font-light shrink-0"
+            className="w-10 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-400 text-lg font-light shrink-0"
           >›</button>
         </div>
         {/* Prawa strona — przyciski */}
@@ -1416,7 +1438,7 @@ export function WeeklyCalendar() {
             Dziś
           </button>
           {/* Przełącznik widoków */}
-          <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+          <div className="flex items-center rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden text-xs font-medium">
             {(['week', 'month', 'year'] as CalendarView[]).map((v) => (
               <button
                 key={v}
@@ -1424,7 +1446,7 @@ export function WeeklyCalendar() {
                 className={`px-2.5 py-1.5 transition-colors ${
                   calendarView === v
                     ? 'bg-indigo-600 text-white'
-                    : 'text-gray-500 hover:bg-gray-50'
+                    : 'text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'
                 }`}
               >
                 {{ week: 'Tydzień', month: 'Miesiąc', year: 'Rok' }[v]}
@@ -1436,7 +1458,7 @@ export function WeeklyCalendar() {
             <button
               onClick={() => setAdminOpen(true)}
               title="Panel administratora"
-              className={`w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors ${adminOpen ? 'bg-gray-100' : ''}`}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors ${adminOpen ? 'bg-gray-100 dark:bg-slate-700' : ''}`}
             >
               <IconRenderer icon="🛡️" iconSet={iconSet} size={16} />
             </button>
@@ -1445,7 +1467,7 @@ export function WeeklyCalendar() {
           <button
             onClick={() => setSettingsOpen(true)}
             title="Ustawienia kalendarza"
-            className={`w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 transition-colors ${settingsOpen ? 'bg-gray-100' : ''}`}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors ${settingsOpen ? 'bg-gray-100 dark:bg-slate-700' : ''}`}
           >
             <IconRenderer icon="⚙️" iconSet={iconSet} size={16} />
           </button>
@@ -1478,7 +1500,7 @@ export function WeeklyCalendar() {
 
           {/* Nagłówki dni — sticky top */}
           <div
-            className="grid border-b border-gray-100 sticky top-0 z-20 bg-white"
+            className="grid border-b border-gray-100 dark:border-slate-700 sticky top-0 z-20 bg-white dark:bg-slate-900"
             style={{ gridTemplateColumns: `48px repeat(${visibleDaysCount}, 1fr)` }}
           >
             <div />
@@ -1487,10 +1509,10 @@ export function WeeklyCalendar() {
               const bdContacts = birthdayContactsForDay(day)
               return (
                 <div key={i} className="text-center py-2 relative">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide">{dayLabel(day)}</div>
+                  <div className="text-xs text-gray-400 dark:text-slate-500 uppercase tracking-wide">{dayLabel(day)}</div>
                   <div
                     className={`text-sm font-semibold mt-0.5 w-7 h-7 mx-auto flex items-center justify-center rounded-full relative ${
-                      isToday ? 'bg-indigo-600 text-white' : 'text-gray-700'
+                      isToday ? 'bg-indigo-600 text-white' : 'text-gray-700 dark:text-slate-200'
                     }`}
                   >
                     {format(day, 'd')}
@@ -1516,11 +1538,11 @@ export function WeeklyCalendar() {
           {/* Siatka z osią czasu i kolumnami dni */}
           <div className="grid" style={{ gridTemplateColumns: `48px repeat(${visibleDaysCount}, 1fr)` }}>
             {/* Oś czasu — sticky left */}
-            <div className="border-r border-gray-100 sticky left-0 bg-white z-10">
+            <div className="border-r border-gray-100 dark:border-slate-700 sticky left-0 bg-white dark:bg-slate-900 z-10">
               {Array.from({ length: hourEnd - hourStart }, (_, i) => (
                 <div
                   key={i}
-                  className="flex items-start justify-end pr-2 pt-1 text-xs text-gray-400 select-none"
+                  className="flex items-start justify-end pr-2 pt-1 text-xs text-gray-400 dark:text-slate-500 select-none"
                   style={{ height: `${HOUR_HEIGHT}px` }}
                 >
                   {`${hourStart + i}:00`}
@@ -1547,6 +1569,22 @@ export function WeeklyCalendar() {
                   undoPush({ type: 'delete', event: ev })
                   await eventsApi.delete(ev.id)
                   qc.invalidateQueries({ queryKey: ['events'] })
+                }}
+                onEventDuplicate={(ev) => {
+                  const dur = (parseISO(ev.end_datetime).getTime() - parseISO(ev.start_datetime).getTime())
+                  const newStart = parseISO(ev.end_datetime)
+                  const newEnd = new Date(newStart.getTime() + dur)
+                  createMut.mutate({
+                    title: ev.title,
+                    start_datetime: newStart.toISOString(),
+                    end_datetime: newEnd.toISOString(),
+                    color: ev.color,
+                    icon: ev.icon,
+                    is_background: ev.is_background,
+                    description: ev.description,
+                    location: ev.location,
+                    activity_template_id: ev.activity_template_id,
+                  } as Parameters<typeof eventsApi.create>[0])
                 }}
                 onEventResizeEnd={(ev, newDur) => {
                   const start = parseISO(ev.start_datetime)

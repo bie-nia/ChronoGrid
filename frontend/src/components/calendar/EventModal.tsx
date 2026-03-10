@@ -300,18 +300,18 @@ export function EventModal({
       className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div ref={modalRef} className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+      <div ref={modalRef} className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
         {/* Header — biały z kolorowym paskiem po lewej */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700">
           <div className="flex items-center gap-3">
             <div className="w-1 h-6 rounded-full" style={{ backgroundColor: accentColor }} />
-            <h2 className="font-bold text-gray-900 text-base">
+            <h2 className="font-bold text-gray-900 dark:text-slate-100 text-base">
               {mode === 'create' ? 'Nowe wydarzenie' : 'Edytuj wydarzenie'}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-lg leading-none"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-lg leading-none"
           >×</button>
         </div>
 
@@ -323,7 +323,7 @@ export function EventModal({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
-            className="w-full text-lg font-bold bg-transparent border-0 border-b-2 border-gray-200 py-1 focus:outline-none placeholder:font-normal placeholder:text-gray-300 text-gray-900 transition-colors"
+            className="w-full text-lg font-bold bg-transparent border-0 border-b-2 border-gray-200 dark:border-slate-600 py-1 focus:outline-none placeholder:font-normal placeholder:text-gray-300 dark:placeholder:text-slate-600 text-gray-900 dark:text-slate-100 transition-colors"
             style={{ '--tw-border-opacity': '1' } as React.CSSProperties}
             onFocus={e => e.currentTarget.style.borderBottomColor = accentColor}
             onBlur={e => e.currentTarget.style.borderBottomColor = ''}
@@ -331,12 +331,12 @@ export function EventModal({
 
           {/* Lokalizacja */}
           <div className="relative">
-            <label className="absolute top-2 left-3 text-xs font-medium text-gray-400 pointer-events-none">Lokalizacja</label>
+            <label className="absolute top-2 left-3 text-xs font-medium text-gray-400 dark:text-slate-500 pointer-events-none">Lokalizacja</label>
             <input
               placeholder="Sala, adres..."
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 pt-6 pb-2 text-sm text-gray-900 placeholder:text-gray-300 focus:outline-none transition-all"
+              className="w-full border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-xl px-3 pt-6 pb-2 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-300 dark:placeholder:text-slate-600 focus:outline-none transition-all"
               onFocus={e => e.currentTarget.style.borderColor = accentColor}
               onBlur={e => e.currentTarget.style.borderColor = ''}
             />
@@ -354,11 +354,11 @@ export function EventModal({
           <div className="flex gap-3 items-start">
             {/* Ikona */}
             <div className="shrink-0">
-              <label className="text-xs text-gray-500 block mb-1">Ikona</label>
+              <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1">Ikona</label>
               <button
                 type="button"
                 onClick={() => setIconPickerOpen(v => !v)}
-                className="w-10 h-10 rounded-xl flex items-center justify-center border-2 border-gray-200 hover:border-indigo-400 transition-colors"
+                className="w-10 h-10 rounded-xl flex items-center justify-center border-2 border-gray-200 dark:border-slate-600 hover:border-indigo-400 transition-colors"
                 style={{ backgroundColor: color + '22', borderColor: iconPickerOpen ? color : undefined, color }}
               >
                 {icon ? <IconRenderer icon={icon} size={20} iconSet={iconSet} /> : <span className="text-gray-400 text-lg">?</span>}
@@ -367,7 +367,7 @@ export function EventModal({
 
             {/* Kolor */}
             <div className="flex-1">
-              <label className="text-xs text-gray-500 block mb-1">Kolor</label>
+              <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1">Kolor</label>
               <div className="flex flex-wrap gap-1.5">
                 {COLOR_OPTIONS.map((c) => (
                   <button
@@ -401,13 +401,13 @@ export function EventModal({
 
           {/* Picker ikon — rozwija się pod wierszem ikona+kolor */}
           {iconPickerOpen && (
-            <div className="border border-gray-200 rounded-xl p-2 space-y-2">
+            <div className="border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-xl p-2 space-y-2">
               <input
                 type="text"
                 placeholder={`Szukaj w ${iconSetConfig.name}...`}
                 value={iconSearch}
                 onChange={(e) => setIconSearch(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                className="w-full border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 autoFocus
               />
               <div className="grid grid-cols-8 gap-1 max-h-32 overflow-y-auto">
@@ -420,8 +420,8 @@ export function EventModal({
                       type="button"
                       title={iconName}
                       onClick={() => { setIcon(iconId); setIconPickerOpen(false) }}
-                      className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
-                        isSelected ? 'ring-2 scale-110' : 'hover:bg-gray-100'
+                      className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all text-slate-700 dark:text-slate-200 ${
+                        isSelected ? 'ring-2 scale-110' : 'hover:bg-gray-100 dark:hover:bg-slate-600'
                       }`}
                       style={isSelected ? { backgroundColor: color + '22', color, outline: `2px solid ${color}` } : {}}
                     >
@@ -435,7 +435,7 @@ export function EventModal({
 
           {/* ── Czas trwania ── */}
           <div>
-            <label className="text-xs text-gray-500 block mb-1.5">Czas trwania</label>
+            <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1.5">Czas trwania</label>
             <div className="flex flex-wrap gap-1.5 items-center">
               {DURATION_PRESETS.map((m) => (
                 <button
@@ -445,7 +445,7 @@ export function EventModal({
                   className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
                     durationMin === m
                       ? 'text-white border-transparent'
-                      : 'border-gray-200 text-gray-500 hover:border-indigo-400'
+                      : 'border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:border-indigo-400'
                   }`}
                   style={durationMin === m ? { backgroundColor: color } : {}}
                 >
@@ -460,33 +460,33 @@ export function EventModal({
                   step={15}
                   value={durationMin}
                   onChange={(e) => handleDurationChange(parseInt(e.target.value) || 15)}
-                  className="w-14 border border-gray-200 rounded-lg px-1.5 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  className="w-14 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 rounded-lg px-1.5 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 />
-                <span className="text-xs text-gray-400">min</span>
+                <span className="text-xs text-gray-400 dark:text-slate-500">min</span>
               </div>
             </div>
           </div>
 
           {/* ── Pin — wysuwany panel (oba tryby) ── */}
-          <div className="border border-gray-100 rounded-xl overflow-hidden" ref={pinPanelRef}>
+          <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden" ref={pinPanelRef}>
             <button
               type="button"
-              onClick={() => { setPinOpen((v) => !v); setPinShowCustom(false); setPinCustomWeeks('') }}
-              className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-indigo-50 transition-colors"
+              onClick={() => { setPinOpen((v) => !v); setPinShowCustom(false); setPinCustomVal('') }}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
             >
-              <span className="font-medium text-indigo-600 flex items-center gap-1.5">
+              <span className="font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
                 <IconRenderer icon="📌" iconSet={iconSet} size={14} /> Pin — duplikuj wydarzenie
                 {mode === 'create' && pinCfgOnCreate !== null && (
                   <span className="text-indigo-400 font-normal">· {pinCfgLabel(pinCfgOnCreate)}</span>
                 )}
               </span>
-              <span className={`text-gray-400 transition-transform duration-200 ${pinOpen ? 'rotate-180' : ''}`}>▾</span>
+              <span className={`text-gray-400 dark:text-slate-500 transition-transform duration-200 ${pinOpen ? 'rotate-180' : ''}`}>▾</span>
             </button>
 
             {pinOpen && (
-              <div className="border-t border-gray-100 px-3 py-3 space-y-2">
+              <div className="border-t border-gray-100 dark:border-slate-700 px-3 py-3 space-y-2">
                 {/* Przełącznik trybu */}
-                <div className="flex rounded-lg overflow-hidden border border-gray-200 text-xs mb-1">
+                <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600 text-xs mb-1">
                   <button
                     type="button"
                     onClick={() => { setPinMode('once'); setPinShowCustom(false); setPinShowDate(false); setPinCustomVal(''); setPinDD(''); setPinMM(''); setPinYY(''); setPinDateError('') }}
@@ -510,7 +510,7 @@ export function EventModal({
                   <button
                     key={v}
                     onClick={() => handlePinSelect(v)}
-                    className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-colors"
+                    className="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 rounded-lg transition-colors"
                   >
                     {label}
                   </button>
@@ -520,18 +520,18 @@ export function EventModal({
                 {pinMode === 'weekly' && (
                   <button
                     onClick={() => handlePinSelect(0)}
-                    className="w-full text-left px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors border-t border-gray-100 pt-2"
+                    className="w-full text-left px-3 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors border-t border-gray-100 dark:border-slate-700 pt-2"
                   >
                     <span className="inline-flex items-center gap-1"><IconRenderer icon="♾️" iconSet={iconSet} size={13} /> Na zawsze</span>
                   </button>
                 )}
 
                 {/* Do daty */}
-                <div className="border-t border-gray-100 pt-2 mt-1 space-y-1">
+                <div className="border-t border-gray-100 dark:border-slate-700 pt-2 mt-1 space-y-1">
                   {!pinShowDate ? (
                     <button
                       onClick={() => { setPinShowDate(true); setPinShowCustom(false); setPinDateError('') }}
-                      className="w-full text-left px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"
+                      className="w-full text-left px-3 py-1.5 text-xs text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     >
                       <span className="inline-flex items-center gap-1">
                         <svg width="12" height="12" viewBox="0 0 15 15" fill="none" className="inline"><path d="M4.5 1a.5.5 0 0 1 .5.5V2h5v-.5a.5.5 0 0 1 1 0V2h1.5A1.5 1.5 0 0 1 14 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 1 12.5v-9A1.5 1.5 0 0 1 2.5 2H4v-.5a.5.5 0 0 1 .5-.5zM2 4.5v8a.5.5 0 0 0 .5.5h10a.5.5 0 0 0 .5-.5v-8H2z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"/></svg>
@@ -610,7 +610,7 @@ export function EventModal({
                 {!pinShowCustom ? (
                   <button
                     onClick={() => { setPinShowCustom(true); setPinShowDate(false) }}
-                    className="w-full text-left px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"
+                    className="w-full text-left px-3 py-1.5 text-xs text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg transition-colors"
                   >
                     <span className="inline-flex items-center gap-1"><IconRenderer icon="✏️" iconSet={iconSet} size={13} /> Custom...</span>
                   </button>
@@ -630,9 +630,9 @@ export function EventModal({
                           if (v > 0) handlePinSelect(v)
                         }
                       }}
-                      className="w-20 border border-indigo-300 rounded-lg px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                      className="w-20 border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 rounded-lg px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-indigo-400"
                     />
-                    <span className="text-xs text-gray-500">{pinMode === 'once' ? 'dni' : 'tygodni'}</span>
+                    <span className="text-xs text-gray-500 dark:text-slate-400">{pinMode === 'once' ? 'dni' : 'tygodni'}</span>
                     <button
                       onClick={() => { const v = parseInt(pinCustomVal); if (v > 0) handlePinSelect(v) }}
                       disabled={!pinCustomVal || parseInt(pinCustomVal) < 1}
@@ -648,41 +648,41 @@ export function EventModal({
           </div>
 
           {/* Zaawansowane — daty, czas trwania, proces w tle */}
-          <div className="border border-gray-100 rounded-xl overflow-hidden">
+          <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
             <button
               type="button"
               onClick={() => setAdvOpen((v) => !v)}
-              className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-500 hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
             >
-              <span className="font-medium text-gray-600 flex items-center gap-1.5">
+              <span className="font-medium text-gray-600 dark:text-slate-300 flex items-center gap-1.5">
                 Zaawansowane
                 {isBackground && <span className="text-indigo-500 font-normal">· Proces w tle</span>}
               </span>
               <span className={`transition-transform duration-200 ${advOpen ? 'rotate-180' : ''}`}>▾</span>
             </button>
             {advOpen && (
-              <div className="px-3 pb-3 pt-2 border-t border-gray-100 space-y-3">
+              <div className="px-3 pb-3 pt-2 border-t border-gray-100 dark:border-slate-700 space-y-3">
 
                 {/* Początek + Koniec */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="relative">
-                    <label className="absolute top-1.5 left-3 text-xs font-medium text-gray-400 pointer-events-none">Początek</label>
+                    <label className="absolute top-1.5 left-3 text-xs font-medium text-gray-400 dark:text-slate-500 pointer-events-none">Początek</label>
                     <input
                       type="datetime-local"
                       value={startDt}
                       onChange={(e) => handleStartChange(e.target.value)}
-                      className="w-full border border-gray-200 rounded-xl px-3 pt-5 pb-1.5 text-xs text-gray-900 focus:outline-none transition-all"
+                      className="w-full border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 rounded-xl px-3 pt-5 pb-1.5 text-xs focus:outline-none transition-all"
                       onFocus={e => e.currentTarget.style.borderColor = accentColor}
                       onBlur={e => e.currentTarget.style.borderColor = ''}
                     />
                   </div>
                   <div className="relative">
-                    <label className="absolute top-1.5 left-3 text-xs font-medium text-gray-400 pointer-events-none">Koniec</label>
+                    <label className="absolute top-1.5 left-3 text-xs font-medium text-gray-400 dark:text-slate-500 pointer-events-none">Koniec</label>
                     <input
                       type="datetime-local"
                       value={endDt}
                       onChange={(e) => handleEndChange(e.target.value)}
-                      className="w-full border border-gray-200 rounded-xl px-3 pt-5 pb-1.5 text-xs text-gray-900 focus:outline-none transition-all"
+                      className="w-full border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 rounded-xl px-3 pt-5 pb-1.5 text-xs focus:outline-none transition-all"
                       onFocus={e => e.currentTarget.style.borderColor = accentColor}
                       onBlur={e => e.currentTarget.style.borderColor = ''}
                     />
@@ -698,12 +698,12 @@ export function EventModal({
                       onChange={(e) => setIsBackground(e.target.checked)}
                       className="sr-only"
                     />
-                    <div className={`w-9 h-5 rounded-full transition-colors ${isBackground ? 'bg-indigo-500' : 'bg-gray-200'}`} />
+                    <div className={`w-9 h-5 rounded-full transition-colors ${isBackground ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-slate-600'}`} />
                     <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${isBackground ? 'translate-x-4' : ''}`} />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-gray-700">Proces w tle</p>
-                    <p className="text-xs text-gray-400">Wyświetlany przezroczyście, nie blokuje czasu</p>
+                    <p className="text-xs font-medium text-gray-700 dark:text-slate-200">Proces w tle</p>
+                    <p className="text-xs text-gray-400 dark:text-slate-500">Wyświetlany przezroczyście, nie blokuje czasu</p>
                   </div>
                 </label>
 
@@ -716,14 +716,14 @@ export function EventModal({
             {onDelete && (
               <button
                 onClick={onDelete}
-                className="px-3 py-2 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                className="px-3 py-2 text-xs text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
               >
                 Usuń
               </button>
             )}
             <button
               onClick={onClose}
-              className="px-3 py-2 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors ml-auto"
+              className="px-3 py-2 text-xs text-gray-600 dark:text-slate-400 border border-gray-200 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors ml-auto"
             >
               Anuluj
             </button>

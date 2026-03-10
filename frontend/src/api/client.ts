@@ -10,9 +10,9 @@ export const api = axios.create({
 
 // ── Request interceptor — dołącz access token ────────────────────────────────
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  const stored = localStorage.getItem('access_token')
+  if (stored) {
+    config.headers.Authorization = `Bearer ${stored}`
   }
   return config
 })
@@ -40,6 +40,11 @@ api.interceptors.response.use(
     // Jeśli 401 i nie próbowaliśmy jeszcze odświeżyć
     if (error.response?.status === 401 && !originalRequest?._retry) {
       const refreshToken = localStorage.getItem('refresh_token')
+
+      // Tryb demo — nie wylogowuj, ignoruj 401
+      if (useAuthStore.getState().accessToken === 'demo-token') {
+        return Promise.reject(error)
+      }
 
       // Brak refresh tokenu — wyloguj od razu
       if (!refreshToken) {

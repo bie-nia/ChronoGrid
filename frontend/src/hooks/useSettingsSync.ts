@@ -19,12 +19,13 @@ export function useSettingsSync() {
   const initializedRef = useRef(false)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Pobierz ustawienia z backendu (tylko gdy zalogowany)
+  // Pobierz ustawienia z backendu (tylko gdy zalogowany).
+  // queryKey zawiera token — każdy nowy login = nowy fetch, bez ryzyku cache z poprzedniej sesji.
   const { data: remoteSettings } = useQuery({
-    queryKey: ['user-settings'],
+    queryKey: ['user-settings', token],
     queryFn: settingsApi.get,
     enabled: !!token,
-    staleTime: Infinity, // pobierz raz
+    staleTime: Infinity, // pobierz raz na sesję (klucz zawiera token)
   })
 
   // Aplikuj ustawienia z backendu do store (tylko raz po załadowaniu)

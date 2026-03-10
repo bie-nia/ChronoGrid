@@ -16,6 +16,7 @@ export interface DragGhost {
 
 export type ScrollMode = 'vertical' | 'horizontal'
 export type CalendarView = 'week' | 'month' | 'year'
+export type Theme = 'light' | 'dark'
 
 // ── Undo stack ────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ interface CalendarState {
   contactPinHash: string | null  // SHA-256 hash PINu/hasła (null = brak blokady)
   iconSet: IconSetId         // aktywna biblioteka ikon
   templateOrder: number[]    // kolejność aktywności (tablica ID)
+  theme: Theme               // motyw: jasny / ciemny
 
   nextWeek: () => void
   prevWeek: () => void
@@ -92,6 +94,7 @@ interface CalendarState {
   setContactPinHash: (hash: string | null) => void
   setIconSet: (id: IconSetId) => void
   setTemplateOrder: (ids: number[]) => void
+  setTheme: (theme: Theme) => void
 }
 
 export const useCalendarStore = create<CalendarState>()(
@@ -110,6 +113,7 @@ export const useCalendarStore = create<CalendarState>()(
       contactPinHash: null,
       iconSet: 'emoji' as IconSetId,
       templateOrder: [],
+      theme: 'light' as Theme,
 
       nextWeek: () => set((s) => ({ weekStart: addWeeks(s.weekStart, 1) })),
       prevWeek: () => set((s) => ({ weekStart: subWeeks(s.weekStart, 1) })),
@@ -142,6 +146,10 @@ export const useCalendarStore = create<CalendarState>()(
       setContactPinHash: (hash) => set({ contactPinHash: hash }),
       setIconSet: (id) => set({ iconSet: id }),
       setTemplateOrder: (ids) => set({ templateOrder: ids }),
+      setTheme: (theme) => {
+        set({ theme })
+        document.documentElement.classList.toggle('dark', theme === 'dark')
+      },
     }),
     {
       name: 'adhd-calendar-settings',
@@ -157,6 +165,7 @@ export const useCalendarStore = create<CalendarState>()(
         contactPinHash: s.contactPinHash,
         iconSet: s.iconSet,
         templateOrder: s.templateOrder,
+        theme: s.theme,
       }),
       // Po rehydracji — przelicz weekStart na podstawie zapisanego viewMode
       onRehydrateStorage: () => (state) => {
@@ -164,6 +173,8 @@ export const useCalendarStore = create<CalendarState>()(
           state.weekStart = computeWeekStart(state.viewMode, state.firstDayOfWeek)
           // Widok dzienny został usunięty — cofnij do tygodniowego
           if ((state.calendarView as string) === 'day') state.calendarView = 'week'
+          // Przywróć klasę dark na <html>
+          document.documentElement.classList.toggle('dark', state.theme === 'dark')
         }
       },
     }

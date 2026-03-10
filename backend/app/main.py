@@ -1,4 +1,7 @@
+import asyncio
 import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -9,17 +12,56 @@ from slowapi.util import get_remote_address
 
 from app.api.v1 import api_router
 from app.core.config import settings
+from app.core.demo_seed import reset_demo_data
+from app.db.base import get_db
 
 UPLOADS_DIR = "/app/uploads"
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
+# ── Limity ────────────────────────────────────────────────────────────────────
+# Globalny limit rozmiaru ciała żądania — zapobiega zapełnieniu RAM
+MAX_BODY_SIZE = 11 * 1024 * 1024  # 11 MB (nieco powyżej max zdjęcia 10 MB)
+
 # ── Rate limiter — klucz: IP klienta ─────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+
+DEMO_RESET_INTERVAL_SECONDS = 3600  # co godzinę
+
+
+async def _demo_reset_loop() -> None:
+    """Resetuje dane demo co godzinę w tle."""
+    while True:
+        await asyncio.sleep(DEMO_RESET_INTERVAL_SECONDS)
+        try:
+            db = next(get_db())
+            reset_demo_data(db)
+            db.close()
+        except Exception as exc:
+            print(f"[demo] reset failed: {exc}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Seed demo przy starcie
+    try:
+        db = next(get_db())
+        reset_demo_data(db)
+        db.close()
+        print("[demo] seed OK")
+    except Exception as exc:
+        print(f"[demo] seed failed at startup: {exc}")
+
+    # Uruchom pętlę resetu w tle
+    task = asyncio.create_task(_demo_reset_loop())
+    yield
+    task.cancel()
+
 
 app = FastAPI(
     title="ADHD Calendar API",
     version="1.0.0",
     description="Time management app with weekly calendar and Eisenhower matrix",
+    lifespan=lifespan,
 )
 
 # Rate limiting
@@ -40,6 +82,20 @@ app.include_router(api_router)
 
 # Serwuje uploadowane zdjęcia jako pliki statyczne
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+
+
+# ── Middleware: limit rozmiaru ciała żądania ──────────────────────────────────
+@app.middleware("http")
+async def limit_request_body(request: Request, call_next) -> Response:
+    """Odrzuca żądania przekraczające MAX_BODY_SIZE przed wczytaniem do RAM."""
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_BODY_SIZE:
+        return Response(
+            content='{"detail":"Request body too large (max 11 MB)."}',
+            status_code=413,
+            media_type="application/json",
+        )
+    return await call_next(request)
 
 
 # ── Security headers middleware ───────────────────────────────────────────────

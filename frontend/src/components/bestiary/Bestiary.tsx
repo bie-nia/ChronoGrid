@@ -22,6 +22,7 @@ async function sha256(text: string): Promise<string> {
 // ── PinGate — formularz weryfikacji PIN przed dostępem do prywatnych danych ──
 function PinGate({ onUnlock, label = 'Podaj PIN aby wyświetlić' }: { onUnlock: () => void; label?: string }) {
   const pinHash = useCalendarStore((s) => s.contactPinHash)
+  const iconSet = useCalendarStore((s) => s.iconSet)
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -42,7 +43,7 @@ function PinGate({ onUnlock, label = 'Podaj PIN aby wyświetlić' }: { onUnlock:
 
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-6 px-4">
-      <span className="text-4xl">🔒</span>
+      <span className="text-white/80"><IconRenderer icon="🔒" iconSet={iconSet} size={40} /></span>
       <p className="text-white/60 text-sm text-center">{label}</p>
       <input
         type="text"
@@ -124,6 +125,7 @@ function ContactForm({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const qc = useQueryClient()
   const pinHash = useCalendarStore((s) => s.contactPinHash)
+  const iconSet = useCalendarStore((s) => s.iconSet)
   // Dla istniejącego kontaktu z notatkami/zainteresowaniami — PIN wymagany przed edycją
   const needsPin = !!pinHash && !!(contact?.notes || contact?.interests)
   const [editPrivateUnlocked, setEditPrivateUnlocked] = useState(!needsPin)
@@ -192,7 +194,7 @@ function ContactForm({
                   title="Zmień zdjęcie"
                 >
                   <span className="text-white text-xs font-medium">
-                    {photoUploading ? '...' : '📷'}
+                    {photoUploading ? '...' : <IconRenderer icon="📷" iconSet={iconSet} size={16} />}
                   </span>
                 </button>
                 <input
@@ -228,7 +230,7 @@ function ContactForm({
         </div>
 
         <div>
-          <label className="text-xs text-white/40 font-medium block mb-1.5">📞 Telefon</label>
+          <label className="text-xs text-white/40 font-medium flex items-center gap-1 mb-1.5"><IconRenderer icon="📞" iconSet={iconSet} size={13} /> Telefon</label>
           <input
             type="tel"
             placeholder="+48 000 000 000"
@@ -239,7 +241,7 @@ function ContactForm({
         </div>
 
         <div>
-          <label className="text-xs text-white/40 font-medium block mb-1.5">🎂 Data urodzin</label>
+          <label className="text-xs text-white/40 font-medium flex items-center gap-1 mb-1.5"><IconRenderer icon="🎂" iconSet={iconSet} size={13} /> Data urodzin</label>
           <div className="flex items-center gap-1.5">
             <input
               type="number"
@@ -270,7 +272,9 @@ function ContactForm({
           </div>
           {birthdayISO && (
             <p className="text-xs text-white/30 mt-1">
-              {isBirthdayToday(birthdayISO) ? '🎉 Dzisiaj!' : `Za ${daysUntilBirthday(birthdayISO)} dni`}
+              {isBirthdayToday(birthdayISO)
+                ? <span className="flex items-center gap-1"><IconRenderer icon="🎉" iconSet={iconSet} size={12} /> Dzisiaj!</span>
+                : `Za ${daysUntilBirthday(birthdayISO)} dni`}
             </p>
           )}
         </div>
@@ -279,10 +283,10 @@ function ContactForm({
         {editPrivateUnlocked ? (
           <>
             {pinHash && (
-              <p className="text-xs text-white/30 flex items-center gap-1">🔓 Sekcja prywatna odblokowana</p>
+              <p className="text-xs text-white/30 flex items-center gap-1"><IconRenderer icon="🔓" iconSet={iconSet} size={13} /> Sekcja prywatna odblokowana</p>
             )}
             <div>
-              <label className="text-xs text-white/40 font-medium block mb-1.5">⭐ Zainteresowania</label>
+              <label className="text-xs text-white/40 font-medium flex items-center gap-1 mb-1.5"><IconRenderer icon="⭐" iconSet={iconSet} size={13} /> Zainteresowania</label>
               <input
                 placeholder="np. fotografia, góry, gotowanie..."
                 value={interests}
@@ -291,7 +295,7 @@ function ContactForm({
               />
             </div>
             <div>
-              <label className="text-xs text-white/40 font-medium block mb-1.5">📝 Notatki</label>
+              <label className="text-xs text-white/40 font-medium flex items-center gap-1 mb-1.5"><IconRenderer icon="📝" iconSet={iconSet} size={13} /> Notatki</label>
               <textarea
                 placeholder="Notatki o osobie..."
                 value={notes}
@@ -480,6 +484,7 @@ function ContactRow({
 // ── Główny overlay ────────────────────────────────────────────────────────────
 export function BestiaryOverlay({ onClose, initialContactId }: { onClose: () => void; initialContactId?: number }) {
   const qc = useQueryClient()
+  const iconSet = useCalendarStore((s) => s.iconSet)
 
   const [selectedId, setSelectedId] = useState<number | null>(initialContactId ?? null)
   const [mode, setMode] = useState<'view' | 'edit' | 'new'>(initialContactId ? 'view' : 'view')
@@ -558,7 +563,10 @@ export function BestiaryOverlay({ onClose, initialContactId }: { onClose: () => 
           {/* Nagłówek listy */}
           <div className="px-4 pt-4 pb-3 border-b border-white/10 space-y-2 shrink-0">
             <div className="flex items-center justify-between">
-              <h2 className="text-white font-bold text-base">📖 Bestiariusz</h2>
+              <h2 className="text-white font-bold text-base flex items-center gap-1.5">
+                <IconRenderer icon="📖" iconSet={iconSet} size={18} />
+                Bestiariusz
+              </h2>
               <button onClick={onClose} className="text-white/30 hover:text-white text-xl leading-none">×</button>
             </div>
             <button
@@ -642,7 +650,7 @@ export function BestiaryOverlay({ onClose, initialContactId }: { onClose: () => 
 
           {mode === 'view' && !selected && (
             <div className="flex-1 flex flex-col items-center justify-center text-white/20 text-sm gap-2">
-              <span className="text-5xl">👈</span>
+              <span className="text-white/20"><IconRenderer icon="👈" iconSet={iconSet} size={48} /></span>
               Wybierz kontakt z listy
             </div>
           )}
@@ -668,7 +676,7 @@ export function Bestiary() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-between group hover:bg-gray-50 rounded-lg px-1 py-1 transition-colors"
+        className="w-full flex items-center justify-between group hover:bg-white/5 rounded-lg px-1 py-1 transition-colors"
       >
         <div className="flex items-center gap-1.5">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1"><IconRenderer icon="📖" iconSet={iconSet} size={13} /> Bestiariusz</h2>

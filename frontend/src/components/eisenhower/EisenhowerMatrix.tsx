@@ -16,6 +16,7 @@ import { tasksApi } from '../../api/tasks'
 import { eventsApi } from '../../api/events'
 import { EisenhowerTask, Event, Quadrant, getQuadrant, quadrantToFlags } from '../../types'
 import { useCalendarStore } from '../../store/calendarStore'
+import type { IconSetId } from '../../lib/iconSets'
 import { IconRenderer } from '../ui/IconRenderer'
 import { parseTodoItems, TodoItem, setTodoChecked } from '../../lib/htmlUtils'
 
@@ -442,7 +443,7 @@ function TaskTile({
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         className={`group relative rounded-lg cursor-grab active:cursor-grabbing select-none transition-all overflow-hidden
-          ${config.bg} border ${isDragging ? 'opacity-30' : 'hover:brightness-110'}`}
+          ${config.bg} border ${config.border} ${isDragging ? 'opacity-30' : 'hover:brightness-110'}`}
         style={{ borderColor: sourceColor ? sourceColor + '70' : undefined,
                  borderLeftWidth: sourceColor ? '3px' : undefined,
                  borderLeftColor: sourceColor ?? undefined }}
@@ -903,6 +904,108 @@ function TaskRecurModal({
 
 
 
+// ── Inline panel przyśpieszenia (wewnątrz menu kontekstowego) ────────────────
+function AcceleratePanel({
+  task,
+  daysLeft,
+  iconSet,
+  onBack,
+  onSave,
+}: {
+  task: EisenhowerTask
+  daysLeft: number
+  iconSet: IconSetId
+  onBack: () => void
+  onSave: (reduceDays: number) => void
+}) {
+  const [selected, setSelected] = useState<number | null>(null)
+  const [isCustom, setIsCustom] = useState(false)
+  const [customVal, setCustomVal] = useState('')
+
+  const canDoToday = daysLeft >= 1
+  const ALL_PRESETS = [1, 2, 3, 5, 7, 14, 30]
+  const presets = ALL_PRESETS.filter((d) => d < daysLeft)
+  const maxReduce = Math.max(daysLeft - 1, 0)
+
+  const finalReduce = isCustom ? (parseInt(customVal) || null) : selected
+  const resultDays = finalReduce !== null ? daysLeft - finalReduce : null
+  const valid = finalReduce !== null && finalReduce >= 1 && finalReduce <= daysLeft
+
+  return (
+    <div className="px-3 py-2 space-y-2 min-w-[220px]">
+      {/* Nagłówek */}
+      <div className="flex items-center gap-2 pb-1 border-b border-white/10">
+        <span className="text-xs font-semibold text-orange-300 flex items-center gap-1">
+          <IconRenderer icon="⚡" iconSet={iconSet} size={13} /> Przyśpiesz
+        </span>
+        <span className="ml-auto text-xs text-white/30">za {daysLeft}d</span>
+        <button
+          onClick={onBack}
+          className="text-white/30 hover:text-white transition-colors text-xs leading-none"
+        >✕</button>
+      </div>
+
+      {/* Presety */}
+      <div className="flex flex-wrap gap-1">
+        {canDoToday && (
+          <button
+            onClick={() => { setSelected(daysLeft); setIsCustom(false) }}
+            className={`text-xs px-2.5 py-1 rounded-lg border font-semibold transition-colors ${
+              !isCustom && selected === daysLeft
+                ? 'bg-orange-500 text-white border-orange-500'
+                : 'border-orange-500/40 text-orange-300 hover:border-orange-400'
+            }`}
+          >Dziś!</button>
+        )}
+        {presets.map((d) => (
+          <button
+            key={d}
+            onClick={() => { setSelected(d); setIsCustom(false) }}
+            className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+              !isCustom && selected === d
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : 'border-white/20 text-white/70 hover:border-indigo-400'
+            }`}
+          >-{d}d</button>
+        ))}
+        {maxReduce > 0 && (
+          <button
+            onClick={() => setIsCustom(true)}
+            className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+              isCustom ? 'bg-indigo-600 text-white border-indigo-600' : 'border-white/20 text-white/50 hover:border-indigo-400'
+            }`}
+          >...</button>
+        )}
+      </div>
+
+      {/* Pole własne */}
+      {isCustom && (
+        <input
+          type="number" min={1} max={daysLeft} autoFocus
+          placeholder={`1–${daysLeft} dni`}
+          value={customVal}
+          onChange={(e) => setCustomVal(e.target.value)}
+          className="w-full bg-white/10 border border-white/20 rounded-lg px-2 py-1 text-xs text-white text-center focus:outline-none focus:ring-1 focus:ring-indigo-400"
+        />
+      )}
+
+      {/* Podgląd + przycisk */}
+      <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/10">
+        <span className="text-xs text-white/40">
+          {valid && resultDays !== null
+            ? (resultDays === 0 ? 'Pojawi się dziś' : `Za ${resultDays}d`)
+            : 'Wybierz skrót'}
+        </span>
+        <button
+          onClick={() => valid && onSave(finalReduce!)}
+          disabled={!valid}
+          className="text-xs px-3 py-1 bg-orange-500 hover:bg-orange-400 disabled:opacity-30 text-white rounded-lg font-semibold transition-colors"
+        >⚡ OK</button>
+      </div>
+    </div>
+  )
+}
+
 // ── Modal przyspieszenia zaplanowanego zadania ────────────────────────────────
 function TaskAccelerateModal({
   task,
@@ -1204,12 +1307,13 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
   const [editTask, setEditTask] = useState<EisenhowerTask | null>(null)
   const [detailTask, setDetailTask] = useState<EisenhowerTask | null>(null)
   const [recurTask, setRecurTask] = useState<EisenhowerTask | null>(null)
-  const [accelerateTask, setAccelerateTask] = useState<{ task: EisenhowerTask; daysLeft: number } | null>(null)
   const [scheduledCtxMenu, setScheduledCtxMenu] = useState<{ x: number; y: number; task: EisenhowerTask; daysLeft: number } | null>(null)
+  const [acceleratePanel, setAcceleratePanel] = useState<{ x: number; y: number; task: EisenhowerTask; daysLeft: number } | null>(null)
   const [schedTooltip, setSchedTooltip] = useState<{ x: number; y: number; task: EisenhowerTask; daysLeft: number } | null>(null)
   const schedTooltipTimer = useRef<number | null>(null)
   const schedLatestPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const scheduledCtxRef = useRef<HTMLDivElement>(null)
+  const acceleratePanelRef = useRef<HTMLDivElement>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -1235,8 +1339,11 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (!scheduledCtxMenu) return
     const handler = (e: MouseEvent) => {
-      if (scheduledCtxRef.current && !scheduledCtxRef.current.contains(e.target as Node)) {
+      const inMenu = scheduledCtxRef.current?.contains(e.target as Node)
+      const inPanel = acceleratePanelRef.current?.contains(e.target as Node)
+      if (!inMenu && !inPanel) {
         setScheduledCtxMenu(null)
+        setAcceleratePanel(null)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -1733,14 +1840,19 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
       {scheduledCtxMenu && createPortal(
         <div
           ref={scheduledCtxRef}
-          className="fixed z-[70] bg-gray-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 min-w-[180px]"
+          className="fixed z-[70] bg-gray-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 min-w-[200px]"
           style={{ left: scheduledCtxMenu.x, top: scheduledCtxMenu.y }}
         >
           <button
             className="w-full text-left px-4 py-2 text-sm text-orange-300 hover:bg-orange-500/15 flex items-center gap-2 font-medium"
             onClick={() => {
-              setAccelerateTask({ task: scheduledCtxMenu.task, daysLeft: scheduledCtxMenu.daysLeft })
-              setScheduledCtxMenu(null)
+              const rect = scheduledCtxRef.current?.getBoundingClientRect()
+              setAcceleratePanel({
+                x: rect ? rect.right + 6 : scheduledCtxMenu.x + 206,
+                y: rect ? rect.top : scheduledCtxMenu.y,
+                task: scheduledCtxMenu.task,
+                daysLeft: scheduledCtxMenu.daysLeft,
+              })
             }}
           >
             <IconRenderer icon="⚡" iconSet={iconSet} size={16} /> Przyśpiesz
@@ -1769,6 +1881,49 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
         document.body,
       )}
 
+      {/* ── Panel przyśpieszenia (boczny) ── */}
+      {acceleratePanel && createPortal(
+        <div
+          ref={acceleratePanelRef}
+          className="fixed z-[71] bg-gray-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden"
+          style={{ left: acceleratePanel.x, top: acceleratePanel.y }}
+        >
+          <AcceleratePanel
+            task={acceleratePanel.task}
+            daysLeft={acceleratePanel.daysLeft}
+            iconSet={iconSet}
+            onBack={() => setAcceleratePanel(null)}
+            onSave={(reduceDays) => {
+              const t = acceleratePanel.task
+              const newDue = new Date(t.due_date!)
+              newDue.setDate(newDue.getDate() - reduceDays)
+              const newDaysLeft = acceleratePanel.daysLeft - reduceDays
+              const targetQ = (t.target_quadrant ?? 'do_first') as Quadrant
+
+              if (newDaysLeft <= 0) {
+                const flags = quadrantToFlags(targetQ)
+                patchMut.mutate({ id: t.id, data: { ...flags, due_date: null, target_quadrant: null } })
+                setPendingIds((prev) => { const s = new Set(prev); s.delete(t.id); return s })
+              } else {
+                const originalDays = t.recurrence_days ?? acceleratePanel.daysLeft
+                const buf = bufferDays(originalDays)
+                const bq = bufferQuadrant(targetQ)
+                if (newDaysLeft <= buf) {
+                  const flags = quadrantToFlags(bq)
+                  patchMut.mutate({ id: t.id, data: { ...flags, due_date: newDue.toISOString() } })
+                  setPendingIds((prev) => { const s = new Set(prev); s.delete(t.id); return s })
+                } else {
+                  patchMut.mutate({ id: t.id, data: { due_date: newDue.toISOString() } })
+                }
+              }
+              setScheduledCtxMenu(null)
+              setAcceleratePanel(null)
+            }}
+          />
+        </div>,
+        document.body,
+      )}
+
       {/* ── Tooltip zaplanowanych ── */}
       {schedTooltip && createPortal(
         <TooltipPopup
@@ -1782,45 +1937,53 @@ function EisenhowerOverlay({ onClose }: { onClose: () => void }) {
         document.body,
       )}
 
-      {/* ── Modal przyspieszenia ── */}
-      {accelerateTask && (
-        <TaskAccelerateModal
-          task={accelerateTask.task}
-          daysLeft={accelerateTask.daysLeft}
-          onClose={() => setAccelerateTask(null)}
-          onSave={(reduceDays) => {
-            const t = accelerateTask.task
-            const newDue = new Date(t.due_date!)
-            newDue.setDate(newDue.getDate() - reduceDays)
-            const newDaysLeft = accelerateTask.daysLeft - reduceDays
-            const targetQ = (t.target_quadrant ?? 'do_first') as Quadrant
 
-            if (newDaysLeft <= 0) {
-              // Czas minął — przenieś od razu do docelowego kwadrantu
-              const flags = quadrantToFlags(targetQ)
-              patchMut.mutate({ id: t.id, data: { ...flags, due_date: null, target_quadrant: null } })
-              setPendingIds((prev) => { const s = new Set(prev); s.delete(t.id); return s })
-            } else {
-              // Sprawdź czy nowy czas mieści się w oknie bufora
-              const originalDays = t.recurrence_days ?? accelerateTask.daysLeft
-              const buf = bufferDays(originalDays)
-              const bq = bufferQuadrant(targetQ)
-              if (newDaysLeft <= buf) {
-                // Przenieś do kwadrantu bufora — widoczny w matrycy
-                const flags = quadrantToFlags(bq)
-                patchMut.mutate({ id: t.id, data: { ...flags, due_date: newDue.toISOString() } })
-                setPendingIds((prev) => { const s = new Set(prev); s.delete(t.id); return s })
-              } else {
-                // Jeszcze poza buforem — tylko zaktualizuj datę
-                patchMut.mutate({ id: t.id, data: { due_date: newDue.toISOString() } })
-              }
-            }
-            setAccelerateTask(null)
-          }}
-        />
-      )}
     </>,
     document.body,
+  )
+}
+
+// ── Pojedynczy kafelek kwadrantu — draggable ─────────────────────────────────
+const QUADRANT_TILES = [
+  { id: 'do_first'  as Quadrant, label: 'Pilne · Ważne',       color: '#ef4444' },
+  { id: 'schedule'  as Quadrant, label: 'Niepilne · Ważne',    color: '#3b82f6' },
+  { id: 'delegate'  as Quadrant, label: 'Pilne · Nieważne',    color: '#eab308' },
+  { id: 'eliminate' as Quadrant, label: 'Niepilne · Nieważne', color: '#6b7280' },
+]
+
+function QuadrantTile({ q, count, onOpen }: { q: typeof QUADRANT_TILES[number]; count: number; onOpen: () => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `eisenhower-quadrant-${q.id}`,
+    data: { type: 'eisenhower_quadrant', quadrant: q.id, color: q.color, label: q.label },
+  })
+
+  // Rozróżnienie klik vs drag — śledzimy czy wskaźnik się ruszył
+  const pointerMovedRef = useRef(false)
+
+  const handlePointerDown = () => { pointerMovedRef.current = false }
+  const handlePointerMove = () => { pointerMovedRef.current = true }
+  const handlePointerUp = () => {
+    if (!pointerMovedRef.current && !isDragging) onOpen()
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onPointerDown={(e) => { handlePointerDown(); (listeners as { onPointerDown?: (e: React.PointerEvent) => void })?.onPointerDown?.(e) }}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      className="rounded-xl px-2.5 py-2 text-left border flex flex-col justify-between h-[56px] cursor-pointer active:cursor-grabbing select-none transition-all hover:brightness-125"
+      style={{
+        backgroundColor: q.color + '33',
+        borderColor: q.color + '66',
+        opacity: isDragging ? 0.4 : 1,
+      }}
+    >
+      <div className="text-xs font-medium leading-tight" style={{ color: q.color }}>{q.label}</div>
+      <div className="text-xl font-bold leading-none mt-1 text-white">{count}</div>
+    </div>
   )
 }
 
@@ -1833,51 +1996,18 @@ export function EisenhowerMatrix() {
   })
   const countByQ = (q: Quadrant) => tasks.filter((t) => getQuadrant(t) === q && t.status !== 'done').length
 
-  // Draggable — cały widget można przeciągnąć na kalendarz
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: 'eisenhower-widget',
-    data: { type: 'eisenhower_widget' },
-  })
-
-  // Ref do śledzenia drag-w-toku — żeby onClick nie otworzyło overlay po dragu
-  const wasDraggingRef = useRef(false)
-  useEffect(() => {
-    if (isDragging) wasDraggingRef.current = true
-  }, [isDragging])
-
-  const handleClick = () => {
-    if (wasDraggingRef.current) {
-      wasDraggingRef.current = false
-      return
-    }
-    setOpen(true)
-  }
-
   return (
     <>
       <div className="space-y-2">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Matryca Eisenhowera</h2>
-        <div
-          ref={setNodeRef}
-          {...attributes}
-          {...listeners}
-          onClick={handleClick}
-          className={`w-full grid grid-cols-2 gap-1.5 group cursor-grab active:cursor-grabbing select-none ${isDragging ? 'opacity-50' : ''}`}
+        <h2
+          className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider cursor-pointer hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors"
+          onClick={() => setOpen(true)}
         >
-          {[
-            { id: 'do_first' as Quadrant, label: 'Pilne · Ważne', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.35)', color: '#ef4444' },
-            { id: 'schedule' as Quadrant, label: 'Niepilne · Ważne', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)', color: '#3b82f6' },
-            { id: 'delegate' as Quadrant, label: 'Pilne · Nieważne', bg: 'rgba(234,179,8,0.12)', border: 'rgba(234,179,8,0.35)', color: '#eab308' },
-            { id: 'eliminate' as Quadrant, label: 'Niepilne · Nieważne', bg: 'rgba(107,114,128,0.12)', border: 'rgba(107,114,128,0.35)', color: '#6b7280' },
-          ].map((q) => (
-            <div
-              key={q.id}
-              className="rounded-xl px-2.5 py-2 text-left transition-all group-hover:brightness-110 border flex flex-col justify-between h-[56px]"
-              style={{ backgroundColor: q.bg, borderColor: q.border }}
-            >
-              <div className="text-xs font-medium leading-tight" style={{ color: q.color }}>{q.label}</div>
-              <div className="text-xl font-bold leading-none mt-1 text-white">{countByQ(q.id)}</div>
-            </div>
+          Matryca Eisenhowera
+        </h2>
+        <div className="w-full grid grid-cols-2 gap-1.5">
+          {QUADRANT_TILES.map((q) => (
+            <QuadrantTile key={q.id} q={q} count={countByQ(q.id)} onOpen={() => setOpen(true)} />
           ))}
         </div>
       </div>

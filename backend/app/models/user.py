@@ -16,6 +16,7 @@ class User(Base):
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_admin: Mapped[bool] = mapped_column(default=False, nullable=False)
+    is_demo: Mapped[bool] = mapped_column(default=False, nullable=False)
     preferences: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

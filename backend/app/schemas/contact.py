@@ -1,14 +1,14 @@
 from datetime import datetime, date
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ContactBase(BaseModel):
-    name: str
-    phone: Optional[str] = None
-    notes: Optional[str] = None
-    interests: Optional[str] = None
+    name: str = Field(..., max_length=200)
+    phone: Optional[str] = Field(None, max_length=50)
+    notes: Optional[str] = Field(None, max_length=50_000)
+    interests: Optional[str] = Field(None, max_length=50_000)
     birthday: Optional[date] = None
     photo_url: Optional[str] = None
 
@@ -18,10 +18,10 @@ class ContactCreate(ContactBase):
 
 
 class ContactUpdate(BaseModel):
-    name: Optional[str] = None
-    phone: Optional[str] = None
-    notes: Optional[str] = None
-    interests: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=200)
+    phone: Optional[str] = Field(None, max_length=50)
+    notes: Optional[str] = Field(None, max_length=50_000)
+    interests: Optional[str] = Field(None, max_length=50_000)
     birthday: Optional[date] = None
     photo_url: Optional[str] = None
 
