@@ -5,6 +5,7 @@ import { contactsApi } from '../../api/contacts'
 import { BASE_URL } from '../../api/client'
 import { Contact } from '../../types'
 import { useCalendarStore } from '../../store/calendarStore'
+import { useAuthStore } from '../../store/authStore'
 import { IconRenderer } from '../ui/IconRenderer'
 
 /** Buduje pełny URL do zdjęcia — obsługuje /uploads/... i zewnętrzne URL */
@@ -19,9 +20,16 @@ async function sha256(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+// ── Zwraca pinHash tylko jeśli użytkownik NIE jest demo ───────────────────────
+function usePinHash(): string | null {
+  const pinHash = useCalendarStore((s) => s.contactPinHash)
+  const isDemo = useAuthStore((s) => s.isDemo)
+  return isDemo ? null : pinHash
+}
+
 // ── PinGate — formularz weryfikacji PIN przed dostępem do prywatnych danych ──
 function PinGate({ onUnlock, label = 'Podaj PIN aby wyświetlić' }: { onUnlock: () => void; label?: string }) {
-  const pinHash = useCalendarStore((s) => s.contactPinHash)
+  const pinHash = usePinHash()
   const iconSet = useCalendarStore((s) => s.iconSet)
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -124,7 +132,7 @@ function ContactForm({
   const [photoError, setPhotoError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const qc = useQueryClient()
-  const pinHash = useCalendarStore((s) => s.contactPinHash)
+  const pinHash = usePinHash()
   const iconSet = useCalendarStore((s) => s.iconSet)
   // Dla istniejącego kontaktu z notatkami/zainteresowaniami — PIN wymagany przed edycją
   const needsPin = !!pinHash && !!(contact?.notes || contact?.interests)
@@ -350,7 +358,7 @@ function ContactDetail({
   contact: Contact
   onEdit: () => void
 }) {
-  const pinHash = useCalendarStore((s) => s.contactPinHash)
+  const pinHash = usePinHash()
   const [privateUnlocked, setPrivateUnlocked] = useState(false)
   const hasPrivate = !!(contact.notes || contact.interests)
   const isToday = contact.birthday ? isBirthdayToday(contact.birthday) : false
