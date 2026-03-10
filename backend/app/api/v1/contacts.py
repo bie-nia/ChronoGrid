@@ -100,6 +100,39 @@ def delete_contact(
     db.commit()
 
 
+@router.delete("/{contact_id}/photo", response_model=ContactOut)
+def delete_contact_photo(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.is_demo:
+        raise HTTPException(
+            status_code=403,
+            detail="Tryb demo: usuwanie zdjęć jest niedozwolone.",
+        )
+    contact = (
+        db.query(Contact)
+        .filter(Contact.id == contact_id, Contact.user_id == current_user.id)
+        .first()
+    )
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    if not contact.photo_url:
+        raise HTTPException(status_code=404, detail="Brak zdjęcia do usunięcia.")
+
+    # Usuń plik z dysku
+    if contact.photo_url.startswith("/uploads/"):
+        file_path = "/app" + contact.photo_url
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+    contact.photo_url = None
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
 @router.post("/{contact_id}/photo", response_model=ContactOut)
 async def upload_contact_photo(
     contact_id: int,

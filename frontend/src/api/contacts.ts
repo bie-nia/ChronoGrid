@@ -25,6 +25,10 @@ export const _contactsImpl = {
     })
     return res.data
   },
+  deletePhoto: async (id: number): Promise<Contact> => {
+    const res = await api.delete<Contact>(`/contacts/${id}/photo`)
+    return res.data
+  },
 }
 
 export const contactsApi = new Proxy(_contactsImpl, {

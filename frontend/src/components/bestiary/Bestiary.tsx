@@ -152,8 +152,23 @@ function ContactForm({
       setPhotoError(msg ?? 'Błąd uploadu zdjęcia')
     } finally {
       setPhotoUploading(false)
-      // Resetuj input żeby można wybrać ten sam plik ponownie
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handlePhotoDelete = async () => {
+    if (!contact?.id || !photoUrl) return
+    setPhotoError(null)
+    setPhotoUploading(true)
+    try {
+      await contactsApi.deletePhoto(contact.id)
+      setPhotoUrl('')
+      qc.invalidateQueries({ queryKey: ['contacts'] })
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setPhotoError(msg ?? 'Błąd usuwania zdjęcia')
+    } finally {
+      setPhotoUploading(false)
     }
   }
 
@@ -205,6 +220,16 @@ function ContactForm({
                     {photoUploading ? '...' : <IconRenderer icon="📷" iconSet={iconSet} size={16} />}
                   </span>
                 </button>
+                {photoUrl && !photoUploading && (
+                  <button
+                    type="button"
+                    onClick={handlePhotoDelete}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 hover:bg-red-400 text-white flex items-center justify-center text-xs leading-none z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Usuń zdjęcie"
+                  >
+                    ×
+                  </button>
+                )}
                 <input
                   ref={fileInputRef}
                   type="file"
