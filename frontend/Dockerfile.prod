@@ -5,8 +5,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN mkdir -p /npm-tmp && \
-    npm install --cache /npm-tmp
+RUN npm install --ignore-scripts && \
+    node node_modules/esbuild/install.js
 
 COPY . .
 
