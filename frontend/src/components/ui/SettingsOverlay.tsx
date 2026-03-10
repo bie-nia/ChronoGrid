@@ -494,8 +494,8 @@ export function SettingsOverlay({ onClose }: { onClose: () => void }) {
           </section>
           )}
 
-          {/* ── Eksport / Import ── */}
-          <section>
+          {/* ── Eksport / Import — ukryty w trybie demo ── */}
+          {!isDemo && <section>
             <h3 className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">Eksport / Import kalendarza</h3>
             <div className="space-y-3">
               {/* Eksport */}
@@ -545,7 +545,7 @@ export function SettingsOverlay({ onClose }: { onClose: () => void }) {
                 </div>
               )}
             </div>
-          </section>
+          </section>}
 
           {/* ── Zmiana hasła — ukryta w trybie demo ── */}
           {!isDemo && (
