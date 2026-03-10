@@ -5,6 +5,14 @@
 #   1. Skopiuj .env.example jako .env i wypełnij wszystkie wartości
 #   2. docker compose -f docker-compose.prod.yml up -d --build
 #
+# Porty wystawione na hoście:
+#   - 8080 → frontend (nginx ze statycznym buildem Vite)
+#   - 8001 → backend API (FastAPI/uvicorn)
+#
+# Caddy (lub inny reverse proxy) powinien routować:
+#   /api/*  →  http://localhost:8001
+#   /*      →  http://localhost:8080
+#
 # Różnice względem docker-compose.yml (dev):
 #   - Backend: brak --reload, workers=2, brak woluminu kodu źródłowego
 #   - Frontend: multi-stage build (Vite → nginx), serwuje statyczne pliki
@@ -32,9 +40,8 @@ services:
   backend:
     build: ./backend
     restart: always
-    # Tylko wewnętrzna sieć — backend NIE jest bezpośrednio dostępny z zewnątrz
-    expose:
-      - "8000"
+    ports:
+      - "8001:8000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-adhd}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-adhd_calendar}
       SECRET_KEY: ${SECRET_KEY:?Ustaw SECRET_KEY w pliku .env}
@@ -64,7 +71,7 @@ services:
         VITE_API_URL: ${VITE_API_URL:?Ustaw VITE_API_URL w pliku .env}
     restart: always
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - backend
 
