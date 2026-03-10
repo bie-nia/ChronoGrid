@@ -29,7 +29,7 @@ const HOUR_HEIGHT = 60
 type ActiveDrag =
   | { type: 'template'; template: ActivityTemplate }
   | { type: 'calendar_event'; event: Event; durationMin: number; grabOffsetMin: number }
-  | { type: 'eisenhower_quadrant'; quadrant: Quadrant; color: string; label: string }
+  | { type: 'eisenhower_quadrant'; quadrant: Quadrant; color: string; label: string; durationMin: number }
   | null
 
 
@@ -159,7 +159,7 @@ export function AppLayout() {
       setDragGhost({
         dayIndex: col.dayIndex,
         startHour,
-        durationMin: 60,
+        durationMin: drag.durationMin,
         color: drag.color,
         icon: '📋',
         title: drag.label,
@@ -178,7 +178,9 @@ export function AppLayout() {
     } else if (data?.type === 'calendar_event') {
       drag = { type: 'calendar_event', event: data.event as Event, durationMin: data.durationMin as number, grabOffsetMin: data.grabOffsetMin as number ?? 0 }
     } else if (data?.type === 'eisenhower_quadrant') {
-      drag = { type: 'eisenhower_quadrant', quadrant: data.quadrant as Quadrant, color: data.color as string, label: data.label as string }
+      const taskCount = (data.taskCount as number) ?? 0
+      const durationMin = Math.min(Math.max(taskCount * 30, 30), 240)
+      drag = { type: 'eisenhower_quadrant', quadrant: data.quadrant as Quadrant, color: data.color as string, label: data.label as string, durationMin }
     }
     activeDragRef.current = drag
     setActiveDrag(drag)
@@ -278,12 +280,13 @@ export function AppLayout() {
         },
       })
     } else if (activeData?.type === 'eisenhower_quadrant') {
-      // Od razu twórz event w odpowiednim kwadrancie — bez pickera
       const quadrant = activeData.quadrant as Quadrant
       const color = activeData.color as string
       const label = activeData.label as string
+      const taskCount = (activeData.taskCount as number) ?? 0
+      const durationMin = Math.min(Math.max(taskCount * 30, 30), 240)
       const end = new Date(targetDate)
-      end.setMinutes(end.getMinutes() + 60)
+      end.setMinutes(end.getMinutes() + durationMin)
       createMut.mutate({
         title: label,
         start_datetime: targetDate.toISOString(),

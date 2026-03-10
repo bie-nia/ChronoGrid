@@ -1954,7 +1954,7 @@ const QUADRANT_TILES = [
 function QuadrantTile({ q, count, onOpen }: { q: typeof QUADRANT_TILES[number]; count: number; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `eisenhower-quadrant-${q.id}`,
-    data: { type: 'eisenhower_quadrant', quadrant: q.id, color: q.color, label: q.label },
+    data: { type: 'eisenhower_quadrant', quadrant: q.id, color: q.color, label: q.label, taskCount: count },
   })
 
   // Rozróżnienie klik vs drag — śledzimy czy wskaźnik się ruszył
