@@ -175,7 +175,7 @@ function MiniMonth({
       {/* Nagłówki dni tygodnia */}
       <div className="grid grid-cols-7 shrink-0">
         {['P','W','S','C','Pi','So','N'].map((d) => (
-          <div key={d} className="text-center text-[8px] text-gray-400 dark:text-slate-600 pb-0.5">{d}</div>
+          <div key={d} className="text-center text-[8px] text-gray-400 dark:text-slate-400 pb-0.5">{d}</div>
         ))}
       </div>
       {/* Siatka dni — rozciąga się na całą dostępną wysokość */}
